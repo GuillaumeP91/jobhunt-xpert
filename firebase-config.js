@@ -5,10 +5,10 @@
 // These values are safe to keep in client-side code — Firebase enforces
 // access control through Firestore security rules, not by hiding this key.
 export const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyB-hBhpTaGPTsPT8RqrxidEuh1rhvFNw4c",
+  authDomain: "jobhunt-xpert.firebaseapp.com",
+  projectId: "jobhunt-xpert",
+  storageBucket: "jobhunt-xpert.firebasestorage.app",
+  messagingSenderId: "1036067212691",
+  appId: "1:1036067212691:web:cb6245c8d57864bc9cac66",
 };
