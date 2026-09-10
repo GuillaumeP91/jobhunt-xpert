@@ -3,7 +3,7 @@ import {
   signInWithPopup, signOut, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, onSnapshot as onDocSnapshot,
+  doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 const STORAGE_KEY = "jobhunting-candidatures";
@@ -66,7 +66,8 @@ const QUOTES = [
   "Great things never came from comfort zones.",
 ];
 
-let candidatures = loadCandidatures();
+let candidatures = [];
+let currentUid = null;
 let editingId = null;
 let editingTags = [];
 let filters = { search: "", tag: "all", attentionOnly: false };
@@ -94,6 +95,7 @@ const gateUnpaid = document.getElementById("gateUnpaid");
 const trackerRoot = document.getElementById("trackerRoot");
 const heroCtaBtn = document.getElementById("heroCtaBtn");
 const unlockBtn = document.getElementById("unlockBtn");
+const addBtn = document.getElementById("addBtn");
 
 const searchInput = document.getElementById("searchInput");
 const tagFilterSelect = document.getElementById("tagFilterSelect");
@@ -193,16 +195,6 @@ function showToast(message) {
 
 /* ---------- data ---------- */
 
-function loadCandidatures() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return parsed.map(migrateCandidature);
-  } catch {
-    return [];
-  }
-}
-
 function normalizeStatus(status) {
   if (STATUSES.includes(status)) return status;
   if (LEGACY_STATUS_MAP[status]) return LEGACY_STATUS_MAP[status];
@@ -236,8 +228,81 @@ function migrateCandidature(c) {
   };
 }
 
-function saveCandidatures() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(candidatures));
+function candidaturesCollection(uid) {
+  return collection(db, "users", uid, "candidatures");
+}
+
+let candidaturesUnsub = null;
+let localImportOffered = false;
+
+function subscribeCandidatures(uid) {
+  if (candidaturesUnsub) candidaturesUnsub();
+  candidaturesUnsub = onSnapshot(
+    candidaturesCollection(uid),
+    (snap) => {
+      candidatures = snap.docs.map((d) => migrateCandidature({ id: d.id, ...d.data() }));
+      render();
+      maybeOfferLocalImport(uid);
+    },
+    (err) => console.error("candidatures listen error", err)
+  );
+}
+
+function unsubscribeCandidatures() {
+  if (candidaturesUnsub) {
+    candidaturesUnsub();
+    candidaturesUnsub = null;
+  }
+}
+
+async function upsertCandidature(uid, item) {
+  await setDoc(doc(db, "users", uid, "candidatures", item.id), item);
+}
+
+async function removeCandidature(uid, id) {
+  await deleteDoc(doc(db, "users", uid, "candidatures", id));
+}
+
+async function importCandidaturesBatch(uid, items) {
+  for (let i = 0; i < items.length; i += 500) {
+    const chunk = items.slice(i, i + 500);
+    const batch = writeBatch(db);
+    chunk.forEach((item) => {
+      batch.set(doc(db, "users", uid, "candidatures", item.id), item);
+    });
+    await batch.commit();
+  }
+}
+
+async function maybeOfferLocalImport(uid) {
+  if (localImportOffered) return;
+  localImportOffered = true;
+  if (candidatures.length > 0) return;
+
+  let localItems;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    localItems = parsed.map(migrateCandidature);
+  } catch {
+    return;
+  }
+
+  const ok = await openDialog({
+    title: "Import your saved applications?",
+    message: `We found ${localItems.length} application${localItems.length === 1 ? "" : "s"} saved on this device. Import them into your JobHunt Xpert account?`,
+    confirmLabel: "Import",
+  });
+  if (!ok) return;
+
+  try {
+    await importCandidaturesBatch(uid, localItems);
+    showToast(`Imported ${localItems.length} application${localItems.length === 1 ? "" : "s"}.`);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't import your saved applications. Please try again.");
+  }
 }
 
 /* ---------- dates & reminders ---------- */
@@ -670,7 +735,7 @@ function closeModal() {
   editingTags = [];
 }
 
-document.getElementById("addBtn").addEventListener("click", () => openModal(null));
+addBtn.addEventListener("click", () => openModal(null));
 document.getElementById("cancelBtn").addEventListener("click", closeModal);
 fieldStatus.addEventListener("change", updateOutcomeVisibility);
 addCustomTagBtn.addEventListener("click", addCustomTag);
@@ -689,7 +754,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) closeModal();
 });
 
-cardForm.addEventListener("submit", (e) => {
+cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = {
     company: fieldCompany.value.trim(),
@@ -705,19 +770,28 @@ cardForm.addEventListener("submit", (e) => {
   };
   if (!data.company || !data.role) return;
 
+  let fullItem;
   if (editingId) {
     const idx = candidatures.findIndex((c) => c.id === editingId);
-    if (idx !== -1) candidatures[idx] = { ...candidatures[idx], ...data };
+    fullItem = idx !== -1 ? { ...candidatures[idx], ...data } : { id: editingId, ...data, notes: [], createdAt: Date.now() };
+    if (idx !== -1) candidatures[idx] = fullItem; else candidatures.push(fullItem);
   } else {
-    candidatures.push({ id: crypto.randomUUID(), ...data, notes: [], createdAt: Date.now() });
+    fullItem = { id: crypto.randomUUID(), ...data, notes: [], createdAt: Date.now() };
+    candidatures.push(fullItem);
   }
 
-  saveCandidatures();
   render();
   closeModal();
+
+  try {
+    await upsertCandidature(currentUid, fullItem);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't save your changes. Please try again.");
+  }
 });
 
-addNoteBtn.addEventListener("click", () => {
+addNoteBtn.addEventListener("click", async () => {
   if (!editingId) return;
   const text = newNoteText.value.trim();
   if (!text) return;
@@ -729,18 +803,31 @@ addNoteBtn.addEventListener("click", () => {
     date: Date.now(),
     status: fieldStatus.value,
   });
-  saveCandidatures();
   newNoteText.value = "";
   renderNotesList(candidatures[idx]);
   render();
+
+  try {
+    await upsertCandidature(currentUid, candidatures[idx]);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't save your note. Please try again.");
+  }
 });
 
-deleteBtn.addEventListener("click", () => {
+deleteBtn.addEventListener("click", async () => {
   if (!editingId) return;
-  candidatures = candidatures.filter((c) => c.id !== editingId);
-  saveCandidatures();
+  const idToDelete = editingId;
+  candidatures = candidatures.filter((c) => c.id !== idToDelete);
   render();
   closeModal();
+
+  try {
+    await removeCandidature(currentUid, idToDelete);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't delete. Please try again.");
+  }
 });
 
 STATUSES.forEach((status) => {
@@ -755,7 +842,7 @@ STATUSES.forEach((status) => {
     container.classList.remove("drag-over");
   });
 
-  container.addEventListener("drop", (e) => {
+  container.addEventListener("drop", async (e) => {
     e.preventDefault();
     container.classList.remove("drag-over");
     const dragging = document.querySelector(".card.dragging");
@@ -765,8 +852,13 @@ STATUSES.forEach((status) => {
     if (item) {
       item.status = status;
       if (status === "response" && !item.outcome) item.outcome = "pending";
-      saveCandidatures();
       render();
+      try {
+        await upsertCandidature(currentUid, item);
+      } catch (err) {
+        console.error(err);
+        showToast("Couldn't save your changes. Please try again.");
+      }
     }
   });
 });
@@ -846,9 +938,14 @@ importJsonInput.addEventListener("change", () => {
       });
       if (ok) {
         candidatures = [...candidatures, ...imported];
-        saveCandidatures();
         render();
-        showToast(`Imported ${imported.length} application${imported.length === 1 ? "" : "s"}.`);
+        try {
+          await importCandidaturesBatch(currentUid, imported);
+          showToast(`Imported ${imported.length} application${imported.length === 1 ? "" : "s"}.`);
+        } catch (err) {
+          console.error(err);
+          showToast("Couldn't save the imported applications. Please try again.");
+        }
       }
     } catch {
       showToast("This file doesn't look like a valid JobHunt Xpert JSON backup.");
@@ -944,24 +1041,35 @@ function handleAuthChange(user) {
     profileUnsub();
     profileUnsub = null;
   }
+  unsubscribeCandidatures();
+  candidatures = [];
+  localImportOffered = false;
 
   if (user) {
+    currentUid = user.uid;
     bootstrapUserProfile(user).catch((err) => console.error("bootstrapUserProfile failed", err));
     signInBtn.classList.add("hidden");
     userMenu.classList.remove("hidden");
     userAvatar.src = user.photoURL || "";
     userDisplayName.textContent = user.displayName || user.email || "Signed in";
 
-    profileUnsub = onDocSnapshot(
+    profileUnsub = onSnapshot(
       doc(db, "users", user.uid),
       (snap) => {
         const paid = snap.exists() && snap.data().paid === true;
         showGateState(paid ? "paid" : "unpaid");
-        if (paid) render();
+        if (paid) {
+          subscribeCandidatures(user.uid);
+        } else {
+          unsubscribeCandidatures();
+          candidatures = [];
+          render();
+        }
       },
       (err) => console.error("profile listen error", err)
     );
   } else {
+    currentUid = null;
     signInBtn.classList.remove("hidden");
     userMenu.classList.add("hidden");
     userAvatar.src = "";
