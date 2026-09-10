@@ -23,7 +23,7 @@
         <h1>JobHunt Xpert</h1>
       </div>
       <div class="header-meta">
-        <div class="stat" id="sentStat">0 applications sent</div>
+        <div class="stat hidden" id="sentStat">0 applications sent</div>
         <button type="button" id="userGreeting" class="user-greeting">+ Add your name</button>
       </div>
     </div>
@@ -35,50 +35,82 @@
         <button id="signOutBtn" class="icon-btn" type="button" title="Sign out">⎋</button>
       </div>
       <button id="themeToggleBtn" class="icon-btn" title="Toggle dark mode" type="button">🌙</button>
-      <button id="addBtn" class="primary-btn">+ New Application</button>
+      <button id="addBtn" class="primary-btn hidden">+ New Application</button>
     </div>
   </header>
 
-  <div class="toolbar">
-    <input type="text" id="searchInput" class="toolbar-input" placeholder="Search by company or role...">
-    <select id="tagFilterSelect" class="toolbar-input"></select>
-    <label class="toolbar-checkbox" title="Shows applications overdue for a follow-up (10+ days since you applied, still Sent or Interview) or with a deadline in the next 3 days (or already passed).">
-      <input type="checkbox" id="attentionCheckbox">
-      Needs attention only
-    </label>
-    <div class="toolbar-spacer"></div>
-    <button id="exportJsonBtn" class="ghost-btn small-btn" type="button">Export JSON</button>
-    <button id="exportCsvBtn" class="ghost-btn small-btn" type="button">Export CSV</button>
-    <button id="importJsonBtn" class="ghost-btn small-btn" type="button">Import JSON</button>
-    <input type="file" id="importJsonInput" accept="application/json" class="hidden">
-  </div>
-
-  <div class="stats-bar" id="statsBar">
-    <div class="stat-tile"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total</div></div>
-    <div class="stat-tile"><div class="stat-value" id="statSent">0</div><div class="stat-label">Sent</div></div>
-    <div class="stat-tile"><div class="stat-value" id="statInterviewRate">0%</div><div class="stat-label">Interview rate</div></div>
-    <div class="stat-tile"><div class="stat-value" id="statResponseRate">0%</div><div class="stat-label">Response rate</div></div>
-    <div class="stat-tile"><div class="stat-value" id="statOfferRate">0%</div><div class="stat-label">Offer rate</div></div>
-  </div>
-
-  <div id="followUpBanner" class="follow-up-banner hidden"></div>
-
-  <div class="board" id="board">
-    <div class="column" data-status="to-apply">
-      <h2>To Apply <span class="count" id="count-to-apply">0</span></h2>
-      <div class="cards" id="cards-to-apply"></div>
+  <section id="heroSection" class="hero">
+    <div class="hero-inner">
+      <h2 class="hero-headline">Land your next job, organized.</h2>
+      <p class="hero-sub">A kanban board built for job hunting: tags, deadlines, follow-up reminders, and cloud sync across every device you own.</p>
+      <div class="hero-price">
+        <span class="hero-price-amount">€39.99</span>
+        <span class="hero-price-terms">one-time · lifetime access</span>
+      </div>
+      <ul class="hero-features">
+        <li>Kanban board with tags, salary, deadlines &amp; contact tracking</li>
+        <li>Automatic follow-up reminders</li>
+        <li>Cloud sync — pick up right where you left off, on any device</li>
+        <li>Export to CSV/JSON anytime, no lock-in</li>
+      </ul>
+      <button type="button" id="heroCtaBtn" class="primary-btn hero-cta">Get Lifetime Access</button>
     </div>
-    <div class="column" data-status="sent">
-      <h2>Sent <span class="count" id="count-sent">0</span></h2>
-      <div class="cards" id="cards-sent"></div>
+  </section>
+
+  <section id="gateUnpaid" class="hero hidden">
+    <div class="hero-inner">
+      <h2 class="hero-headline">You're signed in — almost there.</h2>
+      <p class="hero-sub">Complete your purchase to unlock JobHunt Xpert, forever.</p>
+      <div class="hero-price">
+        <span class="hero-price-amount">€39.99</span>
+        <span class="hero-price-terms">one-time · lifetime access</span>
+      </div>
+      <button type="button" id="unlockBtn" class="primary-btn hero-cta">Unlock Lifetime Access — €39.99</button>
     </div>
-    <div class="column" data-status="interview">
-      <h2>Interview <span class="count" id="count-interview">0</span></h2>
-      <div class="cards" id="cards-interview"></div>
+  </section>
+
+  <div id="trackerRoot" class="hidden">
+    <div class="toolbar">
+      <input type="text" id="searchInput" class="toolbar-input" placeholder="Search by company or role...">
+      <select id="tagFilterSelect" class="toolbar-input"></select>
+      <label class="toolbar-checkbox" title="Shows applications overdue for a follow-up (10+ days since you applied, still Sent or Interview) or with a deadline in the next 3 days (or already passed).">
+        <input type="checkbox" id="attentionCheckbox">
+        Needs attention only
+      </label>
+      <div class="toolbar-spacer"></div>
+      <button id="exportJsonBtn" class="ghost-btn small-btn" type="button">Export JSON</button>
+      <button id="exportCsvBtn" class="ghost-btn small-btn" type="button">Export CSV</button>
+      <button id="importJsonBtn" class="ghost-btn small-btn" type="button">Import JSON</button>
+      <input type="file" id="importJsonInput" accept="application/json" class="hidden">
     </div>
-    <div class="column" data-status="response">
-      <h2>Response <span class="count" id="count-response">0</span></h2>
-      <div class="cards" id="cards-response"></div>
+
+    <div class="stats-bar" id="statsBar">
+      <div class="stat-tile"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total</div></div>
+      <div class="stat-tile"><div class="stat-value" id="statSent">0</div><div class="stat-label">Sent</div></div>
+      <div class="stat-tile"><div class="stat-value" id="statInterviewRate">0%</div><div class="stat-label">Interview rate</div></div>
+      <div class="stat-tile"><div class="stat-value" id="statResponseRate">0%</div><div class="stat-label">Response rate</div></div>
+      <div class="stat-tile"><div class="stat-value" id="statOfferRate">0%</div><div class="stat-label">Offer rate</div></div>
+    </div>
+
+    <div id="followUpBanner" class="follow-up-banner hidden"></div>
+
+    <div class="board" id="board">
+      <div class="column" data-status="to-apply">
+        <h2>To Apply <span class="count" id="count-to-apply">0</span></h2>
+        <div class="cards" id="cards-to-apply"></div>
+      </div>
+      <div class="column" data-status="sent">
+        <h2>Sent <span class="count" id="count-sent">0</span></h2>
+        <div class="cards" id="cards-sent"></div>
+      </div>
+      <div class="column" data-status="interview">
+        <h2>Interview <span class="count" id="count-interview">0</span></h2>
+        <div class="cards" id="cards-interview"></div>
+      </div>
+      <div class="column" data-status="response">
+        <h2>Response <span class="count" id="count-response">0</span></h2>
+        <div class="cards" id="cards-response"></div>
+      </div>
     </div>
   </div>
 

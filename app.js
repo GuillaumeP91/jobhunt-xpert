@@ -3,7 +3,7 @@ import {
   signInWithPopup, signOut, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc,
+  doc, getDoc, setDoc, onSnapshot as onDocSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 const STORAGE_KEY = "jobhunting-candidatures";
@@ -89,6 +89,11 @@ const userMenu = document.getElementById("userMenu");
 const userAvatar = document.getElementById("userAvatar");
 const userDisplayName = document.getElementById("userDisplayName");
 const signOutBtn = document.getElementById("signOutBtn");
+const heroSection = document.getElementById("heroSection");
+const gateUnpaid = document.getElementById("gateUnpaid");
+const trackerRoot = document.getElementById("trackerRoot");
+const heroCtaBtn = document.getElementById("heroCtaBtn");
+const unlockBtn = document.getElementById("unlockBtn");
 
 const searchInput = document.getElementById("searchInput");
 const tagFilterSelect = document.getElementById("tagFilterSelect");
@@ -923,23 +928,60 @@ async function bootstrapUserProfile(user) {
   }
 }
 
+let profileUnsub = null;
+
+function showGateState(state) {
+  // state: "signed-out" | "unpaid" | "paid"
+  heroSection.classList.toggle("hidden", state !== "signed-out");
+  gateUnpaid.classList.toggle("hidden", state !== "unpaid");
+  trackerRoot.classList.toggle("hidden", state !== "paid");
+  sentStat.classList.toggle("hidden", state !== "paid");
+  addBtn.classList.toggle("hidden", state !== "paid");
+}
+
 function handleAuthChange(user) {
+  if (profileUnsub) {
+    profileUnsub();
+    profileUnsub = null;
+  }
+
   if (user) {
     bootstrapUserProfile(user).catch((err) => console.error("bootstrapUserProfile failed", err));
     signInBtn.classList.add("hidden");
     userMenu.classList.remove("hidden");
     userAvatar.src = user.photoURL || "";
     userDisplayName.textContent = user.displayName || user.email || "Signed in";
+
+    profileUnsub = onDocSnapshot(
+      doc(db, "users", user.uid),
+      (snap) => {
+        const paid = snap.exists() && snap.data().paid === true;
+        showGateState(paid ? "paid" : "unpaid");
+        if (paid) render();
+      },
+      (err) => console.error("profile listen error", err)
+    );
   } else {
     signInBtn.classList.remove("hidden");
     userMenu.classList.add("hidden");
     userAvatar.src = "";
     userDisplayName.textContent = "";
+    showGateState("signed-out");
   }
+}
+
+function requestUnlock() {
+  if (!auth.currentUser) {
+    signInWithGoogle();
+    return;
+  }
+  showToast("Payments are coming soon — check back shortly!");
 }
 
 signInBtn.addEventListener("click", signInWithGoogle);
 signOutBtn.addEventListener("click", () => signOut(auth).catch((err) => console.error(err)));
+heroCtaBtn.addEventListener("click", requestUnlock);
+unlockBtn.addEventListener("click", requestUnlock);
 onAuthStateChanged(auth, handleAuthChange);
 
 /* ---------- init ---------- */
