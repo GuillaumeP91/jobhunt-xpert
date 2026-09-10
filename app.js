@@ -863,6 +863,10 @@ userGreeting.addEventListener("click", async () => {
   const trimmed = next.trim();
   if (trimmed) localStorage.setItem(USER_NAME_KEY, trimmed); else localStorage.removeItem(USER_NAME_KEY);
   renderUserGreeting();
+  // community.js owns its own reference to this field (separate module scope) — update the
+  // shared DOM element directly so the Community Wall name stays in sync with the header.
+  const communityNameInput = document.getElementById("communityName");
+  if (communityNameInput) communityNameInput.value = trimmed;
 });
 
 /* ---------- init ---------- */
