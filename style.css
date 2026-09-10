@@ -736,11 +736,60 @@ header h1 {
 
 .spacer { flex: 1; }
 
+.dialog-modal { width: 380px; display: flex; flex-direction: column; gap: 14px; }
+.dialog-message { margin: 0; font-size: 14px; color: var(--text); line-height: 1.5; }
+#dialogInput {
+  font-family: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text); background: var(--input-bg);
+}
+#dialogInput:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(12px);
+  background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px;
+  font-size: 13px; font-weight: 600; box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+  opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease; z-index: 50; max-width: 90vw;
+}
+.toast.visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* community wall */
+.community { padding: 8px 28px 32px; }
+.community-layout {
+  display: grid; grid-template-columns: 160px minmax(0, 1fr) 160px; gap: 20px;
+  align-items: start; max-width: 1040px; margin: 0 auto;
+}
+.ad-slot {
+  border: 1px dashed var(--border); border-radius: 10px; min-height: 300px;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  color: var(--text-muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+  background: rgba(127,127,127,0.04); position: sticky; top: 20px; line-height: 1.6;
+}
+.community-inner { max-width: 720px; margin: 0; background: var(--card-bg); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; }
+.community-head h2 { margin: 0 0 4px; font-size: 17px; font-weight: 700; }
+.community-sub { margin: 0 0 16px; font-size: 13px; color: var(--text-muted); }
+
+.community-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px; padding-bottom: 18px; border-bottom: 1px solid var(--border); }
+.community-form input, .community-form textarea {
+  font-family: inherit; font-size: 14px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--input-bg); resize: vertical;
+}
+.community-form input:focus, .community-form textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.community-form .primary-btn { align-self: flex-end; }
+
+.community-feed { display: flex; flex-direction: column; gap: 10px; max-height: 420px; overflow-y: auto; }
+.community-card { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; }
+.community-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 3px; }
+.community-name { font-size: 13px; font-weight: 700; color: var(--accent); }
+.community-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.community-text { font-size: 13px; color: var(--text); white-space: pre-wrap; line-height: 1.45; }
+.community-empty { font-size: 13px; color: var(--text-muted); font-style: italic; text-align: center; padding: 10px 0; }
+
 @media (max-width: 1000px) {
   .stats-bar { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 900px) {
   .board { grid-template-columns: 1fr 1fr; }
+  .community-layout { grid-template-columns: 1fr; }
+  .ad-slot { display: none; }
 }
 @media (max-width: 560px) {
   .board { grid-template-columns: 1fr; padding: 12px; }
@@ -748,4 +797,5 @@ header h1 {
   .header-title { justify-content: center; }
   .stats-bar { grid-template-columns: repeat(2, 1fr); }
   .field-row { grid-template-columns: 1fr; }
+  .community { padding: 8px 14px 24px; }
 }

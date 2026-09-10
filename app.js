@@ -113,6 +113,64 @@ const tagPresets = document.getElementById("tagPresets");
 const customTagInput = document.getElementById("customTagInput");
 const addCustomTagBtn = document.getElementById("addCustomTagBtn");
 
+const dialogOverlay = document.getElementById("dialogOverlay");
+const dialogTitle = document.getElementById("dialogTitle");
+const dialogMessage = document.getElementById("dialogMessage");
+const dialogInput = document.getElementById("dialogInput");
+const dialogCancelBtn = document.getElementById("dialogCancelBtn");
+const dialogConfirmBtn = document.getElementById("dialogConfirmBtn");
+const toast = document.getElementById("toast");
+
+/* ---------- dialog & toast ---------- */
+
+let dialogResolve = null;
+
+function openDialog({ title = "", message = "", withInput = false, inputValue = "", confirmLabel = "OK", showCancel = true }) {
+  return new Promise((resolve) => {
+    dialogResolve = resolve;
+    dialogTitle.textContent = title;
+    dialogMessage.textContent = message;
+    dialogMessage.classList.toggle("hidden", !message);
+    dialogInput.classList.toggle("hidden", !withInput);
+    dialogInput.value = inputValue;
+    dialogConfirmBtn.textContent = confirmLabel;
+    dialogCancelBtn.classList.toggle("hidden", !showCancel);
+    dialogOverlay.classList.remove("hidden");
+    if (withInput) {
+      dialogInput.focus();
+      dialogInput.select();
+    } else {
+      dialogConfirmBtn.focus();
+    }
+  });
+}
+
+function closeDialog(result) {
+  dialogOverlay.classList.add("hidden");
+  if (dialogResolve) {
+    dialogResolve(result);
+    dialogResolve = null;
+  }
+}
+
+dialogCancelBtn.addEventListener("click", () => closeDialog(null));
+dialogConfirmBtn.addEventListener("click", () => closeDialog(dialogInput.classList.contains("hidden") ? true : dialogInput.value));
+dialogInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); closeDialog(dialogInput.value); }
+});
+dialogOverlay.addEventListener("click", (e) => { if (e.target === dialogOverlay) closeDialog(null); });
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !dialogOverlay.classList.contains("hidden")) closeDialog(null);
+});
+
+let toastTimer = null;
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("visible"), 3500);
+}
+
 /* ---------- data ---------- */
 
 function loadCandidatures() {
@@ -745,19 +803,24 @@ importJsonInput.addEventListener("change", () => {
   const file = importJsonInput.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     try {
       const parsed = JSON.parse(reader.result);
       if (!Array.isArray(parsed)) throw new Error("not an array");
       const imported = parsed.map((c) => migrateCandidature({ ...c, id: undefined }));
-      const ok = window.confirm(`Import ${imported.length} application${imported.length === 1 ? "" : "s"}? They will be added to your current list.`);
+      const ok = await openDialog({
+        title: "Import applications?",
+        message: `Import ${imported.length} application${imported.length === 1 ? "" : "s"}? They will be added to your current list.`,
+        confirmLabel: "Import",
+      });
       if (ok) {
         candidatures = [...candidatures, ...imported];
         saveCandidatures();
         render();
+        showToast(`Imported ${imported.length} application${imported.length === 1 ? "" : "s"}.`);
       }
     } catch {
-      window.alert("This file doesn't look like a valid JobHunt Xpert JSON backup.");
+      showToast("This file doesn't look like a valid JobHunt Xpert JSON backup.");
     } finally {
       importJsonInput.value = "";
     }
@@ -793,9 +856,9 @@ function renderUserGreeting() {
   userGreeting.classList.toggle("is-set", !!name);
 }
 
-userGreeting.addEventListener("click", () => {
+userGreeting.addEventListener("click", async () => {
   const current = localStorage.getItem(USER_NAME_KEY) || "";
-  const next = window.prompt("Your name:", current);
+  const next = await openDialog({ title: "Your name", message: "Shown here and prefilled on the Community Wall.", withInput: true, inputValue: current, confirmLabel: "Save" });
   if (next === null) return;
   const trimmed = next.trim();
   if (trimmed) localStorage.setItem(USER_NAME_KEY, trimmed); else localStorage.removeItem(USER_NAME_KEY);

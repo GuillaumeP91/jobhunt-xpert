@@ -74,6 +74,49 @@
     </div>
   </footer>
 
+  <section class="community">
+    <div class="community-layout">
+      <aside class="ad-slot" aria-label="Advertisement">
+        <span>Advertisement<br>160 × 600</span>
+      </aside>
+
+      <div class="community-inner">
+        <div class="community-head">
+          <h2>Community Wall</h2>
+          <p class="community-sub">Share encouragement, a tip, or a quick win with other job hunters using this board. Messages are visible to everyone who opens this page.</p>
+        </div>
+        <form id="communityForm" class="community-form">
+          <input type="text" id="communityName" maxlength="40" placeholder="Your name (or a nickname)" required>
+          <textarea id="communityText" maxlength="500" rows="2" placeholder="Say something encouraging, ask for advice, share a win..." required></textarea>
+          <button type="submit" class="primary-btn">Post</button>
+        </form>
+        <div id="communityFeed" class="community-feed">
+          <div class="community-empty" id="communityEmpty">Loading community wall...</div>
+        </div>
+      </div>
+
+      <aside class="ad-slot" aria-label="Advertisement">
+        <span>Advertisement<br>160 × 600</span>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Custom dialog (used instead of window.prompt/confirm/alert for a consistent look) -->
+  <div id="dialogOverlay" class="modal-overlay hidden">
+    <div class="modal dialog-modal">
+      <h2 id="dialogTitle"></h2>
+      <p id="dialogMessage" class="dialog-message hidden"></p>
+      <input type="text" id="dialogInput" class="hidden">
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button type="button" id="dialogCancelBtn" class="ghost-btn">Cancel</button>
+        <button type="button" id="dialogConfirmBtn" class="primary-btn">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
   <!-- Add/edit modal -->
   <div id="modalOverlay" class="modal-overlay hidden">
     <div class="modal">
@@ -149,5 +192,6 @@
   </div>
 
   <script src="app.js"></script>
+  <script type="module" src="community.js"></script>
 </body>
 </html>
