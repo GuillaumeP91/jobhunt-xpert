@@ -1,6 +1,6 @@
 import { auth, db, googleProvider } from "./firebase-init.js";
 import {
-  signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged,
+  signInWithPopup, signOut, onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   doc, getDoc, setDoc,
@@ -899,10 +899,12 @@ userGreeting.addEventListener("click", async () => {
 
 async function signInWithGoogle() {
   try {
-    await signInWithRedirect(auth, googleProvider);
+    await signInWithPopup(auth, googleProvider);
   } catch (err) {
     console.error(err);
-    showToast("Couldn't sign in. Please try again.");
+    if (err && err.code !== "auth/popup-closed-by-user") {
+      showToast("Couldn't sign in. Please try again.");
+    }
   }
 }
 
@@ -939,10 +941,6 @@ function handleAuthChange(user) {
 signInBtn.addEventListener("click", signInWithGoogle);
 signOutBtn.addEventListener("click", () => signOut(auth).catch((err) => console.error(err)));
 onAuthStateChanged(auth, handleAuthChange);
-getRedirectResult(auth).catch((err) => {
-  console.error("getRedirectResult failed", err);
-  showToast("Couldn't sign in. Please try again.");
-});
 
 /* ---------- init ---------- */
 
