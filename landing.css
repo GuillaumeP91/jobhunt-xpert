@@ -1,0 +1,217 @@
+/* Landing page — layered on top of style.css's shared tokens (--accent, --bg, --card-bg, etc.) */
+
+body { background: var(--bg); }
+
+.lp-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 28px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+.lp-nav-title { font-weight: 800; font-size: 16px; }
+
+/* ---------- hero ---------- */
+
+.lp-hero {
+  padding: 72px 24px 56px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--accent-soft), transparent);
+}
+.lp-hero-headline {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.15;
+  margin: 0 auto 18px;
+  max-width: 720px;
+  text-wrap: balance;
+}
+.lp-hero-sub {
+  font-size: 17px;
+  color: var(--text-muted);
+  max-width: 560px;
+  margin: 0 auto 40px;
+  line-height: 1.55;
+}
+
+.lp-price-card {
+  max-width: 360px;
+  margin: 0 auto;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: var(--shadow);
+}
+.lp-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+}
+.lp-price-old {
+  font-size: 20px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+}
+.lp-price-new {
+  font-size: 40px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.lp-price-terms {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+  margin-bottom: 18px;
+}
+.lp-price-features {
+  list-style: none;
+  margin: 0 0 22px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  text-align: left;
+  font-size: 14px;
+}
+.lp-price-features li { padding-left: 24px; position: relative; }
+.lp-price-features li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 800;
+}
+.lp-cta {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  font-size: 15px;
+  padding: 13px 20px;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+/* ---------- screenshot ---------- */
+
+.lp-screenshot-section {
+  padding: 0 24px 72px;
+  display: flex;
+  justify-content: center;
+}
+.lp-screenshot-frame {
+  max-width: 1040px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.16);
+}
+.lp-screenshot-frame img { display: block; width: 100%; height: auto; }
+
+/* ---------- benefits ---------- */
+
+.lp-benefits {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 0 24px 72px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+.lp-benefit { text-align: left; }
+.lp-benefit-icon { font-size: 26px; margin-bottom: 10px; }
+.lp-benefit h3 { font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+.lp-benefit p { font-size: 13px; color: var(--text-muted); line-height: 1.5; margin: 0; }
+
+/* ---------- compare & trust sections ---------- */
+
+.lp-compare, .lp-trust {
+  padding: 64px 24px;
+}
+.lp-compare { background: var(--card-bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+.lp-section-inner { max-width: 880px; margin: 0 auto; text-align: center; }
+.lp-eyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.lp-section-inner h2 { font-size: 28px; font-weight: 800; margin: 0 0 14px; text-wrap: balance; }
+.lp-section-sub { font-size: 15px; color: var(--text-muted); max-width: 640px; margin: 0 auto 40px; line-height: 1.6; }
+
+.lp-compare-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  text-align: left;
+}
+.lp-compare-col {
+  border-radius: 14px;
+  padding: 24px 26px;
+  border: 1px solid var(--border);
+}
+.lp-compare-them { background: var(--bg); }
+.lp-compare-us { background: var(--accent-soft); border-color: var(--accent); }
+.lp-compare-head { font-size: 15px; font-weight: 800; margin-bottom: 14px; }
+.lp-compare-col ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 11px; font-size: 14px; }
+.lp-compare-them li { padding-left: 20px; position: relative; color: var(--text-muted); }
+.lp-compare-them li::before { content: "–"; position: absolute; left: 0; color: var(--text-muted); font-weight: 700; }
+.lp-compare-us li { padding-left: 22px; position: relative; }
+.lp-compare-us li::before { content: "✓"; position: absolute; left: 0; color: var(--accent); font-weight: 800; }
+
+.lp-trust-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+  text-align: left;
+}
+.lp-trust-item h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+.lp-trust-item p { font-size: 13px; color: var(--text-muted); line-height: 1.55; margin: 0; }
+
+/* ---------- final cta ---------- */
+
+.lp-final-cta {
+  padding: 72px 24px 80px;
+  text-align: center;
+  background: linear-gradient(180deg, transparent, var(--accent-soft));
+}
+.lp-final-cta h2 { font-size: 30px; font-weight: 800; margin: 0 0 22px; }
+.lp-price-row-compact { margin-bottom: 8px; }
+.lp-price-row-compact .lp-price-terms { display: inline; margin: 0 0 0 6px; }
+.lp-final-cta .lp-cta { width: auto; display: inline-block; margin-top: 22px; padding: 14px 36px; }
+
+/* ---------- footer ---------- */
+
+.lp-footer {
+  padding: 32px 24px;
+  text-align: center;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+}
+.lp-footer .brand-row { justify-content: center; margin-bottom: 10px; }
+.lp-footer p { font-size: 12px; color: var(--text-muted); margin: 0; }
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 900px) {
+  .lp-benefits { grid-template-columns: repeat(2, 1fr); }
+  .lp-trust-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .lp-hero { padding: 48px 18px 40px; }
+  .lp-hero-headline { font-size: 30px; }
+  .lp-benefits { grid-template-columns: 1fr; }
+  .lp-compare-grid { grid-template-columns: 1fr; }
+  .lp-price-row-compact { display: flex; flex-direction: column; gap: 4px; }
+  .lp-price-row-compact .lp-price-terms { margin-left: 0; }
+}
