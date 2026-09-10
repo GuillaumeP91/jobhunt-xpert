@@ -1,3 +1,11 @@
+import { auth, db, googleProvider } from "./firebase-init.js";
+import {
+  signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged,
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
+import {
+  doc, getDoc, setDoc,
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
 const STORAGE_KEY = "jobhunting-candidatures";
 const THEME_KEY = "jobhunting-theme";
 const LAST_NOTIFIED_KEY = "jobhunting-last-notified-date";
@@ -75,6 +83,12 @@ const followUpBanner = document.getElementById("followUpBanner");
 const quoteText = document.getElementById("quoteText");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const userGreeting = document.getElementById("userGreeting");
+
+const signInBtn = document.getElementById("signInBtn");
+const userMenu = document.getElementById("userMenu");
+const userAvatar = document.getElementById("userAvatar");
+const userDisplayName = document.getElementById("userDisplayName");
+const signOutBtn = document.getElementById("signOutBtn");
 
 const searchInput = document.getElementById("searchInput");
 const tagFilterSelect = document.getElementById("tagFilterSelect");
@@ -881,6 +895,55 @@ userGreeting.addEventListener("click", async () => {
   if (communityNameInput) communityNameInput.value = trimmed;
 });
 
+/* ---------- auth ---------- */
+
+async function signInWithGoogle() {
+  try {
+    await signInWithRedirect(auth, googleProvider);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't sign in. Please try again.");
+  }
+}
+
+async function bootstrapUserProfile(user) {
+  const profileRef = doc(db, "users", user.uid);
+  const snap = await getDoc(profileRef);
+  if (!snap.exists()) {
+    await setDoc(profileRef, {
+      email: user.email || "",
+      displayName: user.displayName || "",
+      photoURL: user.photoURL || "",
+      paid: false,
+      createdAt: Date.now(),
+      paidAt: null,
+    });
+  }
+}
+
+function handleAuthChange(user) {
+  if (user) {
+    bootstrapUserProfile(user).catch((err) => console.error("bootstrapUserProfile failed", err));
+    signInBtn.classList.add("hidden");
+    userMenu.classList.remove("hidden");
+    userAvatar.src = user.photoURL || "";
+    userDisplayName.textContent = user.displayName || user.email || "Signed in";
+  } else {
+    signInBtn.classList.remove("hidden");
+    userMenu.classList.add("hidden");
+    userAvatar.src = "";
+    userDisplayName.textContent = "";
+  }
+}
+
+signInBtn.addEventListener("click", signInWithGoogle);
+signOutBtn.addEventListener("click", () => signOut(auth).catch((err) => console.error(err)));
+onAuthStateChanged(auth, handleAuthChange);
+getRedirectResult(auth).catch((err) => {
+  console.error("getRedirectResult failed", err);
+  showToast("Couldn't sign in. Please try again.");
+});
+
 /* ---------- init ---------- */
 
 initTheme();
@@ -889,3 +952,7 @@ updateQuote();
 setInterval(updateQuote, 60 * 1000);
 
 render();
+
+// community.js runs as a separate module scope and calls these via `window`.
+window.renderUserGreeting = renderUserGreeting;
+window.showToast = showToast;

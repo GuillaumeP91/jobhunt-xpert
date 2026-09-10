@@ -28,6 +28,12 @@
       </div>
     </div>
     <div class="header-actions">
+      <button id="signInBtn" class="ghost-btn small-btn" type="button">Sign in with Google</button>
+      <div id="userMenu" class="user-menu hidden">
+        <img id="userAvatar" class="user-avatar" alt="" referrerpolicy="no-referrer">
+        <span id="userDisplayName" class="user-display-name"></span>
+        <button id="signOutBtn" class="icon-btn" type="button" title="Sign out">⎋</button>
+      </div>
       <button id="themeToggleBtn" class="icon-btn" title="Toggle dark mode" type="button">🌙</button>
       <button id="addBtn" class="primary-btn">+ New Application</button>
     </div>
@@ -194,7 +200,7 @@
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script type="module" src="app.js"></script>
   <script type="module" src="community.js"></script>
 </body>
 </html>
