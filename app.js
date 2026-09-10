@@ -99,6 +99,7 @@ const fieldLink = document.getElementById("fieldLink");
 const fieldAppliedDate = document.getElementById("fieldAppliedDate");
 const fieldDeadline = document.getElementById("fieldDeadline");
 const fieldSalary = document.getElementById("fieldSalary");
+const fieldContact = document.getElementById("fieldContact");
 const fieldStatus = document.getElementById("fieldStatus");
 const outcomeField = document.getElementById("outcomeField");
 const fieldOutcome = document.getElementById("fieldOutcome");
@@ -207,6 +208,7 @@ function migrateCandidature(c) {
     appliedDate: c.appliedDate || "",
     deadline: c.deadline || "",
     salary: c.salary || "",
+    contactPerson: c.contactPerson || "",
     tags: Array.isArray(c.tags) ? c.tags : [],
     status,
     outcome: c.outcome || "pending",
@@ -490,6 +492,13 @@ function buildCard(item) {
     metaRow.appendChild(salary);
   }
 
+  if (item.contactPerson) {
+    const contact = document.createElement("span");
+    contact.className = "salary-chip";
+    contact.textContent = `🧑 ${item.contactPerson}`;
+    metaRow.appendChild(contact);
+  }
+
   if (item.status === "response") {
     const badge = document.createElement("span");
     badge.className = `outcome-badge ${item.outcome}`;
@@ -618,6 +627,7 @@ function openModal(item) {
   fieldAppliedDate.value = item ? item.appliedDate || "" : "";
   fieldDeadline.value = item ? item.deadline || "" : "";
   fieldSalary.value = item ? item.salary || "" : "";
+  fieldContact.value = item ? item.contactPerson || "" : "";
   fieldStatus.value = item ? item.status : "to-apply";
   fieldOutcome.value = item ? item.outcome || "pending" : "pending";
   updateOutcomeVisibility();
@@ -669,6 +679,7 @@ cardForm.addEventListener("submit", (e) => {
     appliedDate: fieldAppliedDate.value,
     deadline: fieldDeadline.value,
     salary: fieldSalary.value.trim(),
+    contactPerson: fieldContact.value.trim(),
     tags: [...editingTags],
     status: fieldStatus.value,
     outcome: fieldStatus.value === "response" ? fieldOutcome.value : "pending",
@@ -780,7 +791,7 @@ exportJsonBtn.addEventListener("click", () => {
 });
 
 exportCsvBtn.addEventListener("click", () => {
-  const header = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Tags", "Link", "Notes"];
+  const header = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Contact", "Tags", "Link", "Notes"];
   const rows = candidatures.map((c) => [
     c.company,
     c.role,
@@ -789,6 +800,7 @@ exportCsvBtn.addEventListener("click", () => {
     c.appliedDate,
     c.deadline,
     c.salary,
+    c.contactPerson,
     c.tags.map((t) => resolveTag(t).label).join("; "),
     c.link,
     c.notes.map((n) => `[${STATUS_LABELS[n.status] || n.status}] ${n.text}`).join(" | "),

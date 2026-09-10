@@ -84,29 +84,19 @@
   </footer>
 
   <section class="community">
-    <div class="community-layout">
-      <aside class="ad-slot" aria-label="Advertisement">
-        <span>Advertisement<br>160 × 600</span>
-      </aside>
-
-      <div class="community-inner">
-        <div class="community-head">
-          <h2>Community Wall</h2>
-          <p class="community-sub">Share encouragement, a tip, or a quick win with other job hunters using this board. Messages are visible to everyone who opens this page.</p>
-        </div>
-        <form id="communityForm" class="community-form">
-          <input type="text" id="communityName" maxlength="40" placeholder="Your name (or a nickname)" required>
-          <textarea id="communityText" maxlength="500" rows="2" placeholder="Say something encouraging, ask for advice, share a win..." required></textarea>
-          <button type="submit" class="primary-btn">Post</button>
-        </form>
-        <div id="communityFeed" class="community-feed">
-          <div class="community-empty" id="communityEmpty">Loading community wall...</div>
-        </div>
+    <div class="community-inner">
+      <div class="community-head">
+        <h2>Community Wall</h2>
+        <p class="community-sub">Share encouragement, a tip, or a quick win with other job hunters using this board. Messages are visible to everyone who opens this page.</p>
       </div>
-
-      <aside class="ad-slot" aria-label="Advertisement">
-        <span>Advertisement<br>160 × 600</span>
-      </aside>
+      <form id="communityForm" class="community-form">
+        <input type="text" id="communityName" maxlength="40" placeholder="Your name (or a nickname)" required>
+        <textarea id="communityText" maxlength="500" rows="2" placeholder="Say something encouraging, ask for advice, share a win..." required></textarea>
+        <button type="submit" class="primary-btn">Post</button>
+      </form>
+      <div id="communityFeed" class="community-feed">
+        <div class="community-empty" id="communityEmpty">Loading community wall...</div>
+      </div>
     </div>
   </section>
 
@@ -152,6 +142,10 @@
 
         <label>Salary
           <input type="text" id="fieldSalary" placeholder="e.g. €65,000 - €75,000">
+        </label>
+
+        <label>Contact person
+          <input type="text" id="fieldContact" placeholder="e.g. Jane Doe, Recruiter">
         </label>
 
         <label>Status
