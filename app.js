@@ -154,6 +154,7 @@ const fieldCoverLetter = document.getElementById("fieldCoverLetter");
 const fieldStatus = document.getElementById("fieldStatus");
 const outcomeField = document.getElementById("outcomeField");
 const fieldOutcome = document.getElementById("fieldOutcome");
+const fieldHadInterview = document.getElementById("fieldHadInterview");
 const deleteBtn = document.getElementById("deleteBtn");
 const notesSection = document.getElementById("notesSection");
 const notesHint = document.getElementById("notesHint");
@@ -893,6 +894,11 @@ function updateOutcomeVisibility() {
   outcomeField.classList.toggle("hidden", fieldStatus.value !== "response");
 }
 
+function handleStatusFieldChange() {
+  updateOutcomeVisibility();
+  if (fieldStatus.value === "interview") fieldHadInterview.checked = true;
+}
+
 function setScalePicker(picker, value) {
   picker.dataset.value = String(value);
   picker.querySelectorAll(".scale-btn").forEach((btn) => {
@@ -937,6 +943,7 @@ function openModal(item) {
   fieldCoverLetter.checked = item ? !!item.coverLetter : false;
   fieldStatus.value = item ? item.status : "to-apply";
   fieldOutcome.value = item ? item.outcome || "pending" : "pending";
+  fieldHadInterview.checked = item ? !!item.hadInterview : false;
   updateOutcomeVisibility();
   deleteBtn.classList.toggle("hidden", !item);
 
@@ -960,7 +967,7 @@ function closeModal() {
 
 addBtn.addEventListener("click", () => openModal(null));
 document.getElementById("cancelBtn").addEventListener("click", closeModal);
-fieldStatus.addEventListener("change", updateOutcomeVisibility);
+fieldStatus.addEventListener("change", handleStatusFieldChange);
 addCustomTagBtn.addEventListener("click", addCustomTag);
 customTagInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -979,8 +986,7 @@ document.addEventListener("keydown", (e) => {
 
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const existingItem = editingId ? candidatures.find((c) => c.id === editingId) : null;
-  const hadInterview = !!(existingItem && existingItem.hadInterview) || fieldStatus.value === "interview";
+  const hadInterview = fieldHadInterview.checked;
   const data = {
     company: fieldCompany.value.trim(),
     role: fieldRole.value.trim(),
@@ -1083,8 +1089,16 @@ STATUSES.forEach((status) => {
     const id = dragging.dataset.id;
     const item = candidatures.find((c) => c.id === id);
     if (item) {
+      const prevStatus = item.status;
       item.status = status;
-      if (status === "interview") item.hadInterview = true;
+      if (status === "interview") {
+        item.hadInterview = true;
+      } else if (status === "response" && prevStatus !== "interview") {
+        // Dropped straight into Response without passing through Interview:
+        // this specific move means no interview happened, even if the card
+        // was flagged as interviewed at some earlier point.
+        item.hadInterview = false;
+      }
       if (status === "response" && !item.outcome) item.outcome = "pending";
       render();
       try {
