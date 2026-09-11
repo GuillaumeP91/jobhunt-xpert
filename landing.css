@@ -41,10 +41,17 @@ body { background: var(--bg); }
   line-height: 1.55;
 }
 .lp-hero-price-line {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-muted);
   margin: 0 0 28px;
+}
+.lp-hero-price-line .lp-price-old {
+  font-size: 17px;
 }
 .lp-hero-price-line strong {
   font-size: 22px;
@@ -138,7 +145,7 @@ body { background: var(--bg); }
 .lp-benefits {
   max-width: 1040px;
   margin: 0 auto;
-  padding: 0 24px 72px;
+  padding: 56px 24px 72px;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 24px;
