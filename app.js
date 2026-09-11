@@ -19,6 +19,7 @@ const STATUS_LABELS = {
 };
 const FOLLOW_UP_DAYS = 10;
 const DEADLINE_WARNING_DAYS = 3;
+const INACTIVE_DAYS = 14;
 const LEGACY_STATUS_MAP = {
   "a-postuler": "to-apply",
   envoye: "sent",
@@ -125,12 +126,21 @@ const toolbarEl = document.getElementById("toolbarEl");
 const statsBarEl = document.getElementById("statsBar");
 const onboardingSection = document.getElementById("onboardingSection");
 const onboardTargetRole = document.getElementById("onboardTargetRole");
+const onboardLocation = document.getElementById("onboardLocation");
 const onboardWeeklyGoal = document.getElementById("onboardWeeklyGoal");
+const onboardStartDate = document.getElementById("onboardStartDate");
 const onboardSearchingToggle = document.getElementById("onboardSearchingToggle");
 const onboardImportBtn = document.getElementById("onboardImportBtn");
 const onboardFreshBtn = document.getElementById("onboardFreshBtn");
 const recommendationsBanner = document.getElementById("recommendationsBanner");
 const recommendationsText = document.getElementById("recommendationsText");
+const nextActionsSection = document.getElementById("nextActionsSection");
+const actionFollowUpsCount = document.getElementById("actionFollowUpsCount");
+const actionFollowUpsLabel = document.getElementById("actionFollowUpsLabel");
+const actionInterviewsCount = document.getElementById("actionInterviewsCount");
+const actionInterviewsLabel = document.getElementById("actionInterviewsLabel");
+const actionInactiveCount = document.getElementById("actionInactiveCount");
+const actionInactiveLabel = document.getElementById("actionInactiveLabel");
 const dismissRecommendations = document.getElementById("dismissRecommendations");
 const boardEl = document.getElementById("board");
 
@@ -155,7 +165,16 @@ const fieldStatus = document.getElementById("fieldStatus");
 const outcomeField = document.getElementById("outcomeField");
 const fieldOutcome = document.getElementById("fieldOutcome");
 const fieldHadInterview = document.getElementById("fieldHadInterview");
+const fieldFollowUpDate = document.getElementById("fieldFollowUpDate");
+const fieldFollowUpType = document.getElementById("fieldFollowUpType");
+const fieldFollowUpDone = document.getElementById("fieldFollowUpDone");
+const templateSelect = document.getElementById("templateSelect");
+const templatePreview = document.getElementById("templatePreview");
+const copyTemplateBtn = document.getElementById("copyTemplateBtn");
 const deleteBtn = document.getElementById("deleteBtn");
+const interviewsSection = document.getElementById("interviewsSection");
+const interviewsList = document.getElementById("interviewsList");
+const addInterviewBtn = document.getElementById("addInterviewBtn");
 const notesSection = document.getElementById("notesSection");
 const notesHint = document.getElementById("notesHint");
 const notesList = document.getElementById("notesList");
@@ -165,6 +184,21 @@ const tagsChips = document.getElementById("tagsChips");
 const tagPresets = document.getElementById("tagPresets");
 const customTagInput = document.getElementById("customTagInput");
 const addCustomTagBtn = document.getElementById("addCustomTagBtn");
+
+const interviewModalOverlay = document.getElementById("interviewModalOverlay");
+const interviewModalTitle = document.getElementById("interviewModalTitle");
+const interviewForm = document.getElementById("interviewForm");
+const ivDate = document.getElementById("ivDate");
+const ivTime = document.getElementById("ivTime");
+const ivType = document.getElementById("ivType");
+const ivPeople = document.getElementById("ivPeople");
+const ivNotes = document.getElementById("ivNotes");
+const ivQuestionsAsked = document.getElementById("ivQuestionsAsked");
+const ivQuestionsToAsk = document.getElementById("ivQuestionsToAsk");
+const ivImpression = document.getElementById("ivImpression");
+const ivNextStep = document.getElementById("ivNextStep");
+const ivDeleteBtn = document.getElementById("ivDeleteBtn");
+const ivCancelBtn = document.getElementById("ivCancelBtn");
 
 const dialogOverlay = document.getElementById("dialogOverlay");
 const dialogTitle = document.getElementById("dialogTitle");
@@ -232,6 +266,22 @@ function normalizeStatus(status) {
   return "to-apply";
 }
 
+function migrateInterview(iv) {
+  return {
+    id: iv.id || crypto.randomUUID(),
+    date: iv.date || "",
+    time: iv.time || "",
+    type: iv.type || "",
+    people: iv.people || "",
+    notes: iv.notes || "",
+    questionsAsked: iv.questionsAsked || "",
+    questionsToAsk: iv.questionsToAsk || "",
+    impression: iv.impression || "",
+    nextStep: iv.nextStep || "",
+    createdAt: iv.createdAt || Date.now(),
+  };
+}
+
 function migrateCandidature(c) {
   const status = normalizeStatus(c.status);
   let notes = c.notes;
@@ -242,6 +292,16 @@ function migrateCandidature(c) {
   } else {
     notes = notes.map((n) => ({ ...n, status: normalizeStatus(n.status) }));
   }
+
+  let followUpDate = c.followUpDate || "";
+  let followUpType = c.followUpType || "";
+  if (!followUpDate && c.followUpDate === undefined && (status === "sent" || status === "interview") && c.appliedDate) {
+    // Existing candidature saved before follow-up tracking existed: backfill the same
+    // suggestion the old fixed-10-day reminder used to give, so today's banner keeps working.
+    followUpDate = addDays(c.appliedDate, FOLLOW_UP_DAYS);
+    followUpType = "check-in";
+  }
+
   return {
     id: c.id || crypto.randomUUID(),
     company: c.company || "",
@@ -262,6 +322,10 @@ function migrateCandidature(c) {
     status,
     hadInterview: c.hadInterview !== undefined ? !!c.hadInterview : (status === "interview" || status === "response"),
     outcome: c.outcome || "pending",
+    followUpDate,
+    followUpType,
+    followUpDone: !!c.followUpDone,
+    interviews: Array.isArray(c.interviews) ? c.interviews.map(migrateInterview) : [],
     notes,
     createdAt: c.createdAt || Date.now(),
   };
@@ -351,6 +415,17 @@ function startOfToday() {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
+function todayStr() {
+  const d = startOfToday();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function addDays(dateStr, n) {
+  const base = dateStr ? new Date(dateStr + "T00:00:00") : startOfToday();
+  base.setDate(base.getDate() + n);
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
+}
+
 function daysSince(dateStr) {
   if (!dateStr) return null;
   const applied = new Date(dateStr + "T00:00:00");
@@ -364,9 +439,23 @@ function daysUntil(dateStr) {
 }
 
 function needsFollowUp(item) {
+  if (!item.followUpDate || item.followUpDone) return false;
+  if (item.status !== "sent" && item.status !== "interview") return false;
+  return item.followUpDate <= todayStr();
+}
+
+function isInactive(item) {
   if (item.status !== "sent" && item.status !== "interview") return false;
   const days = daysSince(item.appliedDate);
-  return days !== null && days >= FOLLOW_UP_DAYS;
+  return days !== null && days >= INACTIVE_DAYS;
+}
+
+function needsPreparation(item) {
+  if (item.status !== "interview") return false;
+  const interviews = item.interviews || [];
+  if (interviews.length === 0) return true;
+  const today = todayStr();
+  return interviews.some((iv) => iv.date && iv.date >= today);
 }
 
 function needsDeadlineAttention(item) {
@@ -511,7 +600,24 @@ function render() {
   updateStats();
   updateFollowUpBanner();
   updateInsights();
+  updateNextActions();
   updateOnboardingVisibility();
+}
+
+function updateNextActions() {
+  const followUpsDue = candidatures.filter(needsFollowUp).length;
+  const interviewsToPrepare = candidatures.filter(needsPreparation).length;
+  const inactive = candidatures.filter(isInactive).length;
+
+  actionFollowUpsCount.textContent = followUpsDue;
+  actionFollowUpsLabel.textContent = `follow-up${followUpsDue === 1 ? "" : "s"} due today`;
+  actionInterviewsCount.textContent = interviewsToPrepare;
+  actionInterviewsLabel.textContent = `interview${interviewsToPrepare === 1 ? "" : "s"} to prepare`;
+  actionInactiveCount.textContent = inactive;
+  actionInactiveLabel.textContent = `application${inactive === 1 ? "" : "s"} inactive ${INACTIVE_DAYS}+ days`;
+
+  const anyAction = followUpsDue > 0 || interviewsToPrepare > 0 || inactive > 0;
+  nextActionsSection.classList.toggle("hidden", !anyAction);
 }
 
 function updateStats() {
@@ -548,6 +654,18 @@ function updateFollowUpBanner() {
     followUpBanner.innerHTML = lines.join("<br>");
   }
   maybeNotify(overdue, deadlines);
+}
+
+async function markFollowUpDone(item) {
+  item.followUpDone = true;
+  render();
+  try {
+    await upsertCandidature(currentUid, item);
+    showToast(`Marked follow-up for ${item.company} as done.`);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't save. Please try again.");
+  }
 }
 
 function reachedInterview(item) {
@@ -673,12 +791,14 @@ function updateOnboardingVisibility() {
 async function saveOnboardingInfo() {
   if (!currentUid) return;
   const targetRole = onboardTargetRole.value.trim();
+  const location = onboardLocation.value.trim();
   const weeklyGoal = parseInt(onboardWeeklyGoal.value, 10) || 0;
+  const searchStartDate = onboardStartDate.value;
   const alreadySearching = onboardSearchingToggle.dataset.value || "";
   await setDoc(doc(db, "users", currentUid), {
-    targetRole, weeklyGoal, alreadySearching,
+    targetRole, location, weeklyGoal, searchStartDate, alreadySearching,
   }, { merge: true });
-  return { targetRole, weeklyGoal, alreadySearching };
+  return { targetRole, location, weeklyGoal, searchStartDate, alreadySearching };
 }
 
 function showRecommendations(targetRole, weeklyGoal) {
@@ -786,8 +906,20 @@ function buildCard(item) {
   if (needsFollowUp(item)) {
     const reminder = document.createElement("span");
     reminder.className = "reminder-badge";
-    reminder.textContent = `Follow up · ${daysSince(item.appliedDate)}d`;
+    const overdueDays = daysSince(item.followUpDate);
+    reminder.textContent = overdueDays > 0 ? `Follow up · ${overdueDays}d overdue` : "Follow up · due today";
     metaRow.appendChild(reminder);
+
+    const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "mark-done-btn";
+    doneBtn.textContent = "✓";
+    doneBtn.title = "Mark follow-up as done";
+    doneBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      markFollowUpDone(item);
+    });
+    metaRow.appendChild(doneBtn);
   }
 
   if (item.status === "to-apply" && item.deadline) {
@@ -888,6 +1020,49 @@ function renderNotesList(item) {
   });
 }
 
+function renderInterviewsList(item) {
+  interviewsList.innerHTML = "";
+  if (!item || item.interviews.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "notes-empty";
+    empty.textContent = "No interviews logged yet.";
+    interviewsList.appendChild(empty);
+    return;
+  }
+  [...item.interviews]
+    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
+    .forEach((iv) => {
+      const el = document.createElement("div");
+      el.className = "note-item interview-record-item";
+
+      const header = document.createElement("div");
+      header.className = "interview-item-header";
+
+      const title = document.createElement("span");
+      title.className = "interview-item-title";
+      title.textContent = iv.type || "Interview";
+      header.appendChild(title);
+
+      const meta = document.createElement("span");
+      meta.className = "interview-item-meta";
+      const dateLabel = iv.date ? formatDate(iv.date) : "No date";
+      meta.textContent = iv.time ? `${dateLabel} · ${iv.time}` : dateLabel;
+      header.appendChild(meta);
+
+      el.appendChild(header);
+
+      if (iv.people) {
+        const people = document.createElement("div");
+        people.className = "note-text";
+        people.textContent = iv.people;
+        el.appendChild(people);
+      }
+
+      el.addEventListener("click", () => openInterviewModal(item, iv));
+      interviewsList.appendChild(el);
+    });
+}
+
 /* ---------- modal ---------- */
 
 function updateOutcomeVisibility() {
@@ -897,6 +1072,25 @@ function updateOutcomeVisibility() {
 function handleStatusFieldChange() {
   updateOutcomeVisibility();
   if (fieldStatus.value === "interview") fieldHadInterview.checked = true;
+}
+
+const MESSAGE_TEMPLATES = {
+  "check-in": ({ company, role, contactPerson }) =>
+    `Hi${contactPerson ? ` ${contactPerson}` : ""},\n\nI wanted to follow up on my application for the ${role || "[role]"} position at ${company || "[company]"}. I'm still very interested in the opportunity and would love to hear about next steps whenever you have an update.\n\nThanks for your time,\n`,
+  "thank-you": ({ company, role, contactPerson }) =>
+    `Hi${contactPerson ? ` ${contactPerson}` : ""},\n\nThank you for taking the time to speak with me about the ${role || "[role]"} role at ${company || "[company]"}. I enjoyed our conversation and I'm even more excited about the opportunity. Please let me know if you need anything else from me.\n\nBest,\n`,
+  "second-check-in": ({ company, role, contactPerson }) =>
+    `Hi${contactPerson ? ` ${contactPerson}` : ""},\n\nJust checking in again on the ${role || "[role]"} position at ${company || "[company]"} — I know things can get busy, so no worries if there's nothing new yet. Still very much interested and happy to answer any questions.\n\nThanks,\n`,
+};
+
+function updateTemplatePreview() {
+  const build = MESSAGE_TEMPLATES[templateSelect.value];
+  if (!build) return;
+  templatePreview.value = build({
+    company: fieldCompany.value.trim(),
+    role: fieldRole.value.trim(),
+    contactPerson: fieldContact.value.trim(),
+  });
 }
 
 function setScalePicker(picker, value) {
@@ -944,10 +1138,17 @@ function openModal(item) {
   fieldStatus.value = item ? item.status : "to-apply";
   fieldOutcome.value = item ? item.outcome || "pending" : "pending";
   fieldHadInterview.checked = item ? !!item.hadInterview : false;
+  fieldFollowUpDate.value = item ? item.followUpDate || "" : "";
+  fieldFollowUpType.value = item ? item.followUpType || "" : "";
+  fieldFollowUpDone.checked = item ? !!item.followUpDone : false;
   updateOutcomeVisibility();
   deleteBtn.classList.toggle("hidden", !item);
 
   renderTagEditorUI();
+  updateTemplatePreview();
+
+  interviewsSection.classList.toggle("hidden", !item);
+  if (item) renderInterviewsList(item);
 
   notesSection.classList.toggle("hidden", !item);
   notesHint.classList.toggle("hidden", !!item);
@@ -965,9 +1166,120 @@ function closeModal() {
   editingTags = [];
 }
 
+/* ---------- interview record modal ---------- */
+
+let editingInterviewCandidatureId = null;
+let editingInterviewId = null;
+
+function openInterviewModal(candidature, interview) {
+  editingInterviewCandidatureId = candidature.id;
+  editingInterviewId = interview ? interview.id : null;
+  interviewModalTitle.textContent = interview ? "Edit Interview" : "Add Interview";
+  ivDate.value = interview ? interview.date || "" : "";
+  ivTime.value = interview ? interview.time || "" : "";
+  ivType.value = interview ? interview.type || "" : "";
+  ivPeople.value = interview ? interview.people || "" : "";
+  ivNotes.value = interview ? interview.notes || "" : "";
+  ivQuestionsAsked.value = interview ? interview.questionsAsked || "" : "";
+  ivQuestionsToAsk.value = interview ? interview.questionsToAsk || "" : "";
+  ivImpression.value = interview ? interview.impression || "" : "";
+  ivNextStep.value = interview ? interview.nextStep || "" : "";
+  ivDeleteBtn.classList.toggle("hidden", !interview);
+  interviewModalOverlay.classList.remove("hidden");
+  ivDate.focus();
+}
+
+function closeInterviewModal() {
+  interviewModalOverlay.classList.add("hidden");
+  interviewForm.reset();
+  editingInterviewCandidatureId = null;
+  editingInterviewId = null;
+}
+
+addInterviewBtn.addEventListener("click", () => {
+  const candidature = candidatures.find((c) => c.id === editingId);
+  if (candidature) openInterviewModal(candidature, null);
+});
+
+ivCancelBtn.addEventListener("click", closeInterviewModal);
+interviewModalOverlay.addEventListener("click", (e) => {
+  if (e.target === interviewModalOverlay) closeInterviewModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !interviewModalOverlay.classList.contains("hidden")) closeInterviewModal();
+});
+
+interviewForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const idx = candidatures.findIndex((c) => c.id === editingInterviewCandidatureId);
+  if (idx === -1) return;
+
+  const data = {
+    date: ivDate.value,
+    time: ivTime.value,
+    type: ivType.value,
+    people: ivPeople.value.trim(),
+    notes: ivNotes.value.trim(),
+    questionsAsked: ivQuestionsAsked.value.trim(),
+    questionsToAsk: ivQuestionsToAsk.value.trim(),
+    impression: ivImpression.value.trim(),
+    nextStep: ivNextStep.value.trim(),
+  };
+
+  if (editingInterviewId) {
+    const ivIdx = candidatures[idx].interviews.findIndex((iv) => iv.id === editingInterviewId);
+    if (ivIdx !== -1) {
+      candidatures[idx].interviews[ivIdx] = { ...candidatures[idx].interviews[ivIdx], ...data };
+    }
+  } else {
+    candidatures[idx].interviews.push({ id: crypto.randomUUID(), ...data, createdAt: Date.now() });
+  }
+
+  renderInterviewsList(candidatures[idx]);
+  render();
+  closeInterviewModal();
+
+  try {
+    await upsertCandidature(currentUid, candidatures[idx]);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't save the interview. Please try again.");
+  }
+});
+
+ivDeleteBtn.addEventListener("click", async () => {
+  const idx = candidatures.findIndex((c) => c.id === editingInterviewCandidatureId);
+  if (idx === -1 || !editingInterviewId) return;
+  candidatures[idx].interviews = candidatures[idx].interviews.filter((iv) => iv.id !== editingInterviewId);
+
+  renderInterviewsList(candidatures[idx]);
+  render();
+  closeInterviewModal();
+
+  try {
+    await upsertCandidature(currentUid, candidatures[idx]);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't delete the interview. Please try again.");
+  }
+});
+
 addBtn.addEventListener("click", () => openModal(null));
 document.getElementById("cancelBtn").addEventListener("click", closeModal);
 fieldStatus.addEventListener("change", handleStatusFieldChange);
+templateSelect.addEventListener("change", updateTemplatePreview);
+fieldCompany.addEventListener("input", updateTemplatePreview);
+fieldRole.addEventListener("input", updateTemplatePreview);
+fieldContact.addEventListener("input", updateTemplatePreview);
+copyTemplateBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(templatePreview.value);
+    showToast("Template copied to clipboard.");
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't copy — select the text and copy it manually.");
+  }
+});
 addCustomTagBtn.addEventListener("click", addCustomTag);
 customTagInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -981,17 +1293,32 @@ modalOverlay.addEventListener("click", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !modalOverlay.classList.contains("hidden")) closeModal();
+  if (e.key === "Escape" && !modalOverlay.classList.contains("hidden") && interviewModalOverlay.classList.contains("hidden")) closeModal();
 });
 
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const hadInterview = fieldHadInterview.checked;
+  const appliedDate = fieldAppliedDate.value;
+  const status = fieldStatus.value;
+
+  let followUpDate = fieldFollowUpDate.value;
+  let followUpType = fieldFollowUpType.value;
+  if (!followUpDate) {
+    if (hadInterview) {
+      followUpDate = addDays(todayStr(), 1);
+      followUpType = "thank-you";
+    } else if ((status === "sent" || status === "interview") && appliedDate) {
+      followUpDate = addDays(appliedDate, FOLLOW_UP_DAYS);
+      followUpType = "check-in";
+    }
+  }
+
   const data = {
     company: fieldCompany.value.trim(),
     role: fieldRole.value.trim(),
     link: fieldLink.value.trim(),
-    appliedDate: fieldAppliedDate.value,
+    appliedDate,
     deadline: fieldDeadline.value,
     salary: fieldSalary.value.trim(),
     contactPerson: fieldContact.value.trim(),
@@ -1003,19 +1330,22 @@ cardForm.addEventListener("submit", async (e) => {
     tailoredCv: fieldTailoredCv.checked,
     coverLetter: fieldCoverLetter.checked,
     tags: [...editingTags],
-    status: fieldStatus.value,
+    status,
     hadInterview,
-    outcome: fieldStatus.value === "response" ? fieldOutcome.value : "pending",
+    followUpDate,
+    followUpType,
+    followUpDone: fieldFollowUpDone.checked,
+    outcome: status === "response" ? fieldOutcome.value : "pending",
   };
   if (!data.company || !data.role) return;
 
   let fullItem;
   if (editingId) {
     const idx = candidatures.findIndex((c) => c.id === editingId);
-    fullItem = idx !== -1 ? { ...candidatures[idx], ...data } : { id: editingId, ...data, notes: [], createdAt: Date.now() };
+    fullItem = idx !== -1 ? { ...candidatures[idx], ...data } : { id: editingId, ...data, notes: [], interviews: [], createdAt: Date.now() };
     if (idx !== -1) candidatures[idx] = fullItem; else candidatures.push(fullItem);
   } else {
-    fullItem = { id: crypto.randomUUID(), ...data, notes: [], createdAt: Date.now() };
+    fullItem = { id: crypto.randomUUID(), ...data, notes: [], interviews: [], createdAt: Date.now() };
     candidatures.push(fullItem);
   }
 
@@ -1149,8 +1479,15 @@ exportJsonBtn.addEventListener("click", () => {
   downloadBlob(JSON.stringify(candidatures, null, 2), "job-applications-backup.json", "application/json");
 });
 
+const CSV_HEADER = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Contact", "Source", "CV Version", "Match Score", "Interest Score", "Referral", "Tailored CV", "Cover Letter", "Follow-up Date", "Follow-up Done", "Interviews", "Tags", "Link", "Notes"];
+
+function summarizeInterviews(interviews) {
+  if (!interviews || interviews.length === 0) return "0";
+  const lastDate = [...interviews].map((iv) => iv.date).filter(Boolean).sort().pop();
+  return lastDate ? `${interviews.length} (last: ${lastDate})` : String(interviews.length);
+}
+
 exportCsvBtn.addEventListener("click", () => {
-  const header = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Contact", "Source", "CV Version", "Match Score", "Interest Score", "Referral", "Tailored CV", "Cover Letter", "Tags", "Link", "Notes"];
   const rows = candidatures.map((c) => [
     c.company,
     c.role,
@@ -1167,43 +1504,121 @@ exportCsvBtn.addEventListener("click", () => {
     c.referral ? "Yes" : "No",
     c.tailoredCv ? "Yes" : "No",
     c.coverLetter ? "Yes" : "No",
+    c.followUpDate,
+    c.followUpDone ? "Yes" : "No",
+    summarizeInterviews(c.interviews),
     c.tags.map((t) => resolveTag(t).label).join("; "),
     c.link,
     c.notes.map((n) => `[${STATUS_LABELS[n.status] || n.status}] ${n.text}`).join(" | "),
   ]);
-  const csv = [header, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n");
+  const csv = [CSV_HEADER, ...rows].map((row) => row.map(csvEscape).join(",")).join("\r\n");
   downloadBlob(csv, "job-applications.csv", "text/csv");
 });
 
 importJsonBtn.addEventListener("click", () => importJsonInput.click());
 
+const LABEL_TO_STATUS = Object.fromEntries(Object.entries(STATUS_LABELS).map(([k, v]) => [v.toLowerCase(), k]));
+const LABEL_TO_TAG_ID = Object.fromEntries(TAG_PRESETS.map((t) => [t.label.toLowerCase(), t.id]));
+
+function parseCsvText(text) {
+  const rows = [];
+  let field = "";
+  let row = [];
+  let inQuotes = false;
+  let i = 0;
+  const s = text.replace(/\r\n/g, "\n");
+  while (i < s.length) {
+    const ch = s[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += ch; i++; continue;
+    }
+    if (ch === '"') { inQuotes = true; i++; continue; }
+    if (ch === ",") { row.push(field); field = ""; i++; continue; }
+    if (ch === "\n") { row.push(field); rows.push(row); field = ""; row = []; i++; continue; }
+    field += ch; i++;
+  }
+  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+  return rows.filter((r) => r.some((v) => v !== ""));
+}
+
+function csvRowsToCandidatures(rows) {
+  if (rows.length < 2) return [];
+  const header = rows[0].map((h) => h.trim().toLowerCase());
+  const idx = (name) => header.indexOf(name.toLowerCase());
+  const get = (row, name) => {
+    const i = idx(name);
+    return i === -1 ? "" : (row[i] || "").trim();
+  };
+  return rows.slice(1).map((row) => {
+    const tagsRaw = get(row, "Tags");
+    return migrateCandidature({
+      company: get(row, "Company"),
+      role: get(row, "Role"),
+      status: LABEL_TO_STATUS[get(row, "Status").toLowerCase()] || "to-apply",
+      outcome: get(row, "Outcome").toLowerCase() || "pending",
+      appliedDate: get(row, "Applied On"),
+      deadline: get(row, "Deadline"),
+      salary: get(row, "Salary"),
+      contactPerson: get(row, "Contact"),
+      source: get(row, "Source"),
+      cvVersion: get(row, "CV Version"),
+      matchScore: get(row, "Match Score"),
+      interestScore: get(row, "Interest Score"),
+      referral: get(row, "Referral").toLowerCase() === "yes",
+      tailoredCv: get(row, "Tailored CV").toLowerCase() === "yes",
+      coverLetter: get(row, "Cover Letter").toLowerCase() === "yes",
+      followUpDate: get(row, "Follow-up Date"),
+      followUpDone: get(row, "Follow-up Done").toLowerCase() === "yes",
+      tags: tagsRaw ? tagsRaw.split(";").map((t) => t.trim()).filter(Boolean).map((t) => LABEL_TO_TAG_ID[t.toLowerCase()] || t) : [],
+      link: get(row, "Link"),
+    });
+  });
+}
+
+async function handleImportedItems(imported) {
+  const ok = await openDialog({
+    title: "Import applications?",
+    message: `Import ${imported.length} application${imported.length === 1 ? "" : "s"}? They will be added to your current list.`,
+    confirmLabel: "Import",
+  });
+  if (!ok) return;
+  candidatures = [...candidatures, ...imported];
+  render();
+  try {
+    await importCandidaturesBatch(currentUid, imported);
+    showToast(`Imported ${imported.length} application${imported.length === 1 ? "" : "s"}.`);
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't save the imported applications. Please try again.");
+  }
+}
+
 importJsonInput.addEventListener("change", () => {
   const file = importJsonInput.files[0];
   if (!file) return;
+  const isCsv = /\.csv$/i.test(file.name);
   const reader = new FileReader();
   reader.onload = async () => {
     try {
-      const parsed = JSON.parse(reader.result);
-      if (!Array.isArray(parsed)) throw new Error("not an array");
-      const imported = parsed.map((c) => migrateCandidature({ ...c, id: undefined }));
-      const ok = await openDialog({
-        title: "Import applications?",
-        message: `Import ${imported.length} application${imported.length === 1 ? "" : "s"}? They will be added to your current list.`,
-        confirmLabel: "Import",
-      });
-      if (ok) {
-        candidatures = [...candidatures, ...imported];
-        render();
-        try {
-          await importCandidaturesBatch(currentUid, imported);
-          showToast(`Imported ${imported.length} application${imported.length === 1 ? "" : "s"}.`);
-        } catch (err) {
-          console.error(err);
-          showToast("Couldn't save the imported applications. Please try again.");
-        }
+      let imported;
+      if (isCsv) {
+        const rows = parseCsvText(reader.result);
+        imported = csvRowsToCandidatures(rows);
+        if (imported.length === 0) throw new Error("empty");
+      } else {
+        const parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed)) throw new Error("not an array");
+        imported = parsed.map((c) => migrateCandidature({ ...c, id: undefined }));
       }
+      await handleImportedItems(imported);
     } catch {
-      showToast("This file doesn't look like a valid JobHunt Xpert JSON backup.");
+      showToast(isCsv
+        ? "This file doesn't look like a valid JobHunt Xpert CSV export."
+        : "This file doesn't look like a valid JobHunt Xpert JSON backup.");
     } finally {
       importJsonInput.value = "";
     }

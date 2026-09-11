@@ -69,8 +69,16 @@
           <input type="text" id="onboardTargetRole" placeholder="e.g. Product Manager">
         </div>
         <div class="onboarding-field">
+          <label for="onboardLocation">Where are you searching?</label>
+          <input type="text" id="onboardLocation" placeholder="e.g. Paris, Remote">
+        </div>
+        <div class="onboarding-field">
           <label for="onboardWeeklyGoal">How many applications do you want to send each week?</label>
           <input type="number" id="onboardWeeklyGoal" min="1" placeholder="e.g. 10">
+        </div>
+        <div class="onboarding-field">
+          <label for="onboardStartDate">When did you start your search?</label>
+          <input type="date" id="onboardStartDate">
         </div>
         <div class="onboarding-field">
           <div class="notes-label">Are you already searching?</div>
@@ -91,18 +99,36 @@
       <div id="recommendationsText"></div>
     </div>
 
+    <div id="nextActionsSection" class="next-actions hidden">
+      <div class="action-card" id="actionFollowUps">
+        <div class="action-icon">⏰</div>
+        <div class="action-count" id="actionFollowUpsCount">0</div>
+        <div class="action-label" id="actionFollowUpsLabel">follow-ups due today</div>
+      </div>
+      <div class="action-card" id="actionInterviews">
+        <div class="action-icon">🎤</div>
+        <div class="action-count" id="actionInterviewsCount">0</div>
+        <div class="action-label" id="actionInterviewsLabel">interviews to prepare</div>
+      </div>
+      <div class="action-card" id="actionInactive">
+        <div class="action-icon">💤</div>
+        <div class="action-count" id="actionInactiveCount">0</div>
+        <div class="action-label" id="actionInactiveLabel">applications inactive 14+ days</div>
+      </div>
+    </div>
+
     <div class="toolbar" id="toolbarEl">
       <input type="text" id="searchInput" class="toolbar-input" placeholder="Search by company or role...">
       <select id="tagFilterSelect" class="toolbar-input"></select>
-      <label class="toolbar-checkbox" title="Shows applications overdue for a follow-up (10+ days since you applied, still Sent or Interview) or with a deadline in the next 3 days (or already passed).">
+      <label class="toolbar-checkbox" title="Shows applications with a follow-up due (their follow-up date has arrived and isn't marked done) or with a deadline in the next 3 days (or already passed).">
         <input type="checkbox" id="attentionCheckbox">
         Needs attention only
       </label>
       <div class="toolbar-spacer"></div>
       <button id="exportJsonBtn" class="ghost-btn small-btn" type="button">Export JSON</button>
       <button id="exportCsvBtn" class="ghost-btn small-btn" type="button">Export CSV</button>
-      <button id="importJsonBtn" class="ghost-btn small-btn" type="button">Import JSON</button>
-      <input type="file" id="importJsonInput" accept="application/json" class="hidden">
+      <button id="importJsonBtn" class="ghost-btn small-btn" type="button">Import</button>
+      <input type="file" id="importJsonInput" accept=".json,.csv,application/json,text/csv" class="hidden">
     </div>
 
     <div class="stats-bar" id="statsBar">
@@ -243,6 +269,33 @@
         </label>
         <label class="inline-checkbox" id="hadInterviewField"><input type="checkbox" id="fieldHadInterview"> Had an interview?</label>
 
+        <div class="field-row">
+          <label>Next follow-up
+            <input type="date" id="fieldFollowUpDate">
+          </label>
+          <label>Follow-up type
+            <select id="fieldFollowUpType">
+              <option value="">—</option>
+              <option value="check-in">Check-in</option>
+              <option value="thank-you">Thank-you</option>
+            </select>
+          </label>
+        </div>
+        <label class="inline-checkbox" id="followUpDoneField"><input type="checkbox" id="fieldFollowUpDone"> Follow-up done?</label>
+
+        <div class="template-field">
+          <div class="notes-label">Message template</div>
+          <div class="template-row">
+            <select id="templateSelect">
+              <option value="check-in">Check-in</option>
+              <option value="thank-you">Thank-you</option>
+              <option value="second-check-in">Second check-in</option>
+            </select>
+            <button type="button" id="copyTemplateBtn" class="ghost-btn">Copy</button>
+          </div>
+          <textarea id="templatePreview" rows="4" readonly></textarea>
+        </div>
+
         <div class="scale-field">
           <div class="notes-label">How well do you match this job?</div>
           <div class="scale-picker" id="matchScorePicker" data-value="0">
@@ -281,6 +334,12 @@
           </div>
         </div>
 
+        <div id="interviewsSection" class="notes-section hidden">
+          <div class="notes-label">Interviews</div>
+          <div id="interviewsList" class="notes-list"></div>
+          <button type="button" id="addInterviewBtn" class="ghost-btn">+ Add interview</button>
+        </div>
+
         <div id="notesSection" class="notes-section hidden">
           <div class="notes-label">Notes</div>
           <div id="notesList" class="notes-list"></div>
@@ -295,6 +354,58 @@
           <button type="button" id="deleteBtn" class="danger-btn hidden">Delete</button>
           <div class="spacer"></div>
           <button type="button" id="cancelBtn" class="ghost-btn">Cancel</button>
+          <button type="submit" class="primary-btn">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Interview record modal -->
+  <div id="interviewModalOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 id="interviewModalTitle">Add Interview</h2>
+      <form id="interviewForm">
+        <div class="field-row">
+          <label>Date
+            <input type="date" id="ivDate">
+          </label>
+          <label>Time
+            <input type="time" id="ivTime">
+          </label>
+        </div>
+        <label>Interview type
+          <select id="ivType">
+            <option value="">—</option>
+            <option value="Phone screen">Phone screen</option>
+            <option value="Video call">Video call</option>
+            <option value="Technical">Technical</option>
+            <option value="On-site">On-site</option>
+            <option value="Final round">Final round</option>
+            <option value="Other">Other</option>
+          </select>
+        </label>
+        <label>People met
+          <input type="text" id="ivPeople" placeholder="e.g. Jane Doe (HR), John Smith (Eng Manager)">
+        </label>
+        <label>Notes
+          <textarea id="ivNotes" rows="3"></textarea>
+        </label>
+        <label>Questions asked
+          <textarea id="ivQuestionsAsked" rows="3" placeholder="Questions they asked you..."></textarea>
+        </label>
+        <label>Questions to ask
+          <textarea id="ivQuestionsToAsk" rows="3" placeholder="Questions you want to ask..."></textarea>
+        </label>
+        <label>Personal impression
+          <textarea id="ivImpression" rows="2"></textarea>
+        </label>
+        <label>Expected next step
+          <input type="text" id="ivNextStep" placeholder="e.g. Waiting for final decision by Friday">
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="ivDeleteBtn" class="danger-btn hidden">Delete</button>
+          <div class="spacer"></div>
+          <button type="button" id="ivCancelBtn" class="ghost-btn">Cancel</button>
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </form>

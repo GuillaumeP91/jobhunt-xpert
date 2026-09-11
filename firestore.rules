@@ -21,7 +21,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['email', 'displayName', 'photoURL', 'paid', 'createdAt', 'paidAt']);
       allow update: if request.auth != null && request.auth.uid == uid
                     && request.resource.data.paid == resource.data.paid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'targetRole', 'weeklyGoal', 'alreadySearching']);
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'targetRole', 'location', 'weeklyGoal', 'searchStartDate', 'alreadySearching']);
       allow delete: if false;
 
       match /candidatures/{candId} {
