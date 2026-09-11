@@ -27,6 +27,14 @@ body { background: var(--bg); }
   max-width: 720px;
   text-wrap: balance;
 }
+.lp-hero-tagline {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent);
+  max-width: 520px;
+  margin: 0 auto 18px;
+  line-height: 1.5;
+}
 .lp-hero-sub {
   font-size: 17px;
   color: var(--text-muted);

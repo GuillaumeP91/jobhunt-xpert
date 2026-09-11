@@ -111,6 +111,29 @@ const statInterviewRate = document.getElementById("statInterviewRate");
 const statResponseRate = document.getElementById("statResponseRate");
 const statOfferRate = document.getElementById("statOfferRate");
 
+const insightsSection = document.getElementById("insightsSection");
+const insightSource = document.getElementById("insightSource");
+const insightSourceRows = document.getElementById("insightSourceRows");
+const insightCv = document.getElementById("insightCv");
+const insightCvRows = document.getElementById("insightCvRows");
+const insightMatch = document.getElementById("insightMatch");
+const insightMatchText = document.getElementById("insightMatchText");
+const insightTailored = document.getElementById("insightTailored");
+const insightTailoredRows = document.getElementById("insightTailoredRows");
+
+const toolbarEl = document.getElementById("toolbarEl");
+const statsBarEl = document.getElementById("statsBar");
+const onboardingSection = document.getElementById("onboardingSection");
+const onboardTargetRole = document.getElementById("onboardTargetRole");
+const onboardWeeklyGoal = document.getElementById("onboardWeeklyGoal");
+const onboardSearchingToggle = document.getElementById("onboardSearchingToggle");
+const onboardImportBtn = document.getElementById("onboardImportBtn");
+const onboardFreshBtn = document.getElementById("onboardFreshBtn");
+const recommendationsBanner = document.getElementById("recommendationsBanner");
+const recommendationsText = document.getElementById("recommendationsText");
+const dismissRecommendations = document.getElementById("dismissRecommendations");
+const boardEl = document.getElementById("board");
+
 const modalOverlay = document.getElementById("modalOverlay");
 const modalTitle = document.getElementById("modalTitle");
 const cardForm = document.getElementById("cardForm");
@@ -121,6 +144,13 @@ const fieldAppliedDate = document.getElementById("fieldAppliedDate");
 const fieldDeadline = document.getElementById("fieldDeadline");
 const fieldSalary = document.getElementById("fieldSalary");
 const fieldContact = document.getElementById("fieldContact");
+const fieldSource = document.getElementById("fieldSource");
+const fieldCvVersion = document.getElementById("fieldCvVersion");
+const matchScorePicker = document.getElementById("matchScorePicker");
+const interestScorePicker = document.getElementById("interestScorePicker");
+const fieldReferral = document.getElementById("fieldReferral");
+const fieldTailoredCv = document.getElementById("fieldTailoredCv");
+const fieldCoverLetter = document.getElementById("fieldCoverLetter");
 const fieldStatus = document.getElementById("fieldStatus");
 const outcomeField = document.getElementById("outcomeField");
 const fieldOutcome = document.getElementById("fieldOutcome");
@@ -220,6 +250,13 @@ function migrateCandidature(c) {
     deadline: c.deadline || "",
     salary: c.salary || "",
     contactPerson: c.contactPerson || "",
+    source: c.source || "",
+    cvVersion: c.cvVersion || "",
+    matchScore: Number(c.matchScore) || 0,
+    interestScore: Number(c.interestScore) || 0,
+    referral: !!c.referral,
+    tailoredCv: !!c.tailoredCv,
+    coverLetter: !!c.coverLetter,
     tags: Array.isArray(c.tags) ? c.tags : [],
     status,
     outcome: c.outcome || "pending",
@@ -471,6 +508,8 @@ function render() {
   renderTagFilterOptions();
   updateStats();
   updateFollowUpBanner();
+  updateInsights();
+  updateOnboardingVisibility();
 }
 
 function updateStats() {
@@ -506,6 +545,150 @@ function updateFollowUpBanner() {
     followUpBanner.innerHTML = lines.join("<br>");
   }
   maybeNotify(overdue, deadlines);
+}
+
+function reachedInterview(item) {
+  return item.status === "interview" || item.status === "response";
+}
+
+function buildInsightRow(label, sentCount, interviewCount) {
+  const row = document.createElement("div");
+  row.className = "insight-row";
+
+  const left = document.createElement("div");
+  left.className = "insight-row-left";
+  const labelSpan = document.createElement("span");
+  labelSpan.className = "insight-row-label";
+  labelSpan.textContent = label;
+  const detailSpan = document.createElement("span");
+  detailSpan.className = "insight-row-detail";
+  detailSpan.textContent = `${sentCount} application${sentCount === 1 ? "" : "s"} → ${interviewCount} interview${interviewCount === 1 ? "" : "s"}`;
+  left.appendChild(labelSpan);
+  left.appendChild(detailSpan);
+
+  const rate = document.createElement("span");
+  rate.className = "insight-row-rate";
+  const pct = sentCount ? (interviewCount / sentCount) * 100 : 0;
+  rate.textContent = `${pct % 1 === 0 ? pct : pct.toFixed(1)}%`;
+
+  row.appendChild(left);
+  row.appendChild(rate);
+  return row;
+}
+
+function groupBy(items, keyFn) {
+  const map = new Map();
+  items.forEach((item) => {
+    const key = keyFn(item);
+    if (!key) return;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(item);
+  });
+  return map;
+}
+
+function updateInsights() {
+  const sent = candidatures.filter((c) => !!c.appliedDate);
+
+  // Where are your interviews coming from?
+  const bySource = groupBy(sent, (c) => c.source);
+  insightSourceRows.innerHTML = "";
+  if (bySource.size > 0) {
+    [...bySource.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .forEach(([source, items]) => {
+        const interviews = items.filter(reachedInterview).length;
+        insightSourceRows.appendChild(buildInsightRow(source, items.length, interviews));
+      });
+    insightSource.classList.remove("hidden");
+  } else {
+    insightSource.classList.add("hidden");
+  }
+
+  // Which CV performs best?
+  const byCv = groupBy(sent, (c) => c.cvVersion);
+  insightCvRows.innerHTML = "";
+  if (byCv.size >= 2) {
+    [...byCv.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .forEach(([cv, items]) => {
+        const interviews = items.filter(reachedInterview).length;
+        insightCvRows.appendChild(buildInsightRow(cv, items.length, interviews));
+      });
+    insightCv.classList.remove("hidden");
+  } else {
+    insightCv.classList.add("hidden");
+  }
+
+  // Insights that need a meaningful sample size
+  const unlocked = candidatures.length >= 50;
+
+  if (unlocked) {
+    const highMatch = sent.filter((c) => c.matchScore >= 4);
+    const lowMatch = sent.filter((c) => c.matchScore > 0 && c.matchScore < 4);
+    const highRate = highMatch.length ? highMatch.filter(reachedInterview).length / highMatch.length : 0;
+    const lowRate = lowMatch.length ? lowMatch.filter(reachedInterview).length / lowMatch.length : 0;
+    if (highMatch.length > 0 && lowMatch.length > 0 && lowRate > 0) {
+      const multiplier = highRate / lowRate;
+      insightMatchText.innerHTML = `Your high-match applications generate <strong>${multiplier % 1 === 0 ? multiplier : multiplier.toFixed(1)}×</strong> more interviews.`;
+      insightMatch.classList.remove("hidden");
+    } else {
+      insightMatch.classList.add("hidden");
+    }
+
+    const tailored = sent.filter((c) => c.tailoredCv);
+    const generic = sent.filter((c) => !c.tailoredCv);
+    insightTailoredRows.innerHTML = "";
+    if (tailored.length > 0 && generic.length > 0) {
+      insightTailoredRows.appendChild(buildInsightRow("Tailored CVs", tailored.length, tailored.filter(reachedInterview).length));
+      insightTailoredRows.appendChild(buildInsightRow("Generic CV", generic.length, generic.filter(reachedInterview).length));
+      insightTailored.classList.remove("hidden");
+    } else {
+      insightTailored.classList.add("hidden");
+    }
+  } else {
+    insightMatch.classList.add("hidden");
+    insightTailored.classList.add("hidden");
+  }
+
+  const anyVisible = !insightSource.classList.contains("hidden")
+    || !insightCv.classList.contains("hidden")
+    || !insightMatch.classList.contains("hidden")
+    || !insightTailored.classList.contains("hidden");
+  insightsSection.classList.toggle("hidden", !anyVisible);
+}
+
+function updateOnboardingVisibility() {
+  const empty = candidatures.length === 0;
+  onboardingSection.classList.toggle("hidden", !empty);
+  toolbarEl.classList.toggle("hidden", empty);
+  statsBarEl.classList.toggle("hidden", empty);
+  boardEl.classList.toggle("hidden", empty);
+  if (!empty) recommendationsBanner.classList.add("hidden");
+}
+
+async function saveOnboardingInfo() {
+  if (!currentUid) return;
+  const targetRole = onboardTargetRole.value.trim();
+  const weeklyGoal = parseInt(onboardWeeklyGoal.value, 10) || 0;
+  const alreadySearching = onboardSearchingToggle.dataset.value || "";
+  await setDoc(doc(db, "users", currentUid), {
+    targetRole, weeklyGoal, alreadySearching,
+  }, { merge: true });
+  return { targetRole, weeklyGoal, alreadySearching };
+}
+
+function showRecommendations(targetRole, weeklyGoal) {
+  const lines = [];
+  if (weeklyGoal > 0) {
+    lines.push(`🎯 Aim for <strong>${weeklyGoal} application${weeklyGoal === 1 ? "" : "s"}</strong> this week${targetRole ? ` as ${targetRole}` : ""}.`);
+  } else if (targetRole) {
+    lines.push(`🎯 Tracking your search for <strong>${targetRole}</strong> roles.`);
+  }
+  lines.push(`📍 Tag each application's Source so you can see where your interviews come from.`);
+  lines.push(`📄 Note the CV version you used — after a few applications you'll see which one performs best.`);
+  recommendationsText.innerHTML = lines.join("<br>");
+  recommendationsBanner.classList.remove("hidden");
 }
 
 function maybeNotify(overdueItems, deadlineItems) {
@@ -581,6 +764,13 @@ function buildCard(item) {
     contact.className = "salary-chip";
     contact.textContent = `🧑 ${item.contactPerson}`;
     metaRow.appendChild(contact);
+  }
+
+  if (item.source) {
+    const source = document.createElement("span");
+    source.className = "salary-chip";
+    source.textContent = `📍 ${item.source}`;
+    metaRow.appendChild(source);
   }
 
   if (item.status === "response") {
@@ -701,6 +891,30 @@ function updateOutcomeVisibility() {
   outcomeField.classList.toggle("hidden", fieldStatus.value !== "response");
 }
 
+function setScalePicker(picker, value) {
+  picker.dataset.value = String(value);
+  picker.querySelectorAll(".scale-btn").forEach((btn) => {
+    btn.classList.toggle("active", Number(btn.dataset.score) === value);
+  });
+}
+
+function getScalePickerValue(picker) {
+  return Number(picker.dataset.value) || 0;
+}
+
+function initScalePicker(picker) {
+  picker.querySelectorAll(".scale-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const score = Number(btn.dataset.score);
+      const current = getScalePickerValue(picker);
+      setScalePicker(picker, current === score ? 0 : score);
+    });
+  });
+}
+
+initScalePicker(matchScorePicker);
+initScalePicker(interestScorePicker);
+
 function openModal(item) {
   editingId = item ? item.id : null;
   editingTags = item ? [...item.tags] : [];
@@ -712,6 +926,13 @@ function openModal(item) {
   fieldDeadline.value = item ? item.deadline || "" : "";
   fieldSalary.value = item ? item.salary || "" : "";
   fieldContact.value = item ? item.contactPerson || "" : "";
+  fieldSource.value = item ? item.source || "" : "";
+  fieldCvVersion.value = item ? item.cvVersion || "" : "";
+  setScalePicker(matchScorePicker, item ? item.matchScore || 0 : 0);
+  setScalePicker(interestScorePicker, item ? item.interestScore || 0 : 0);
+  fieldReferral.checked = item ? !!item.referral : false;
+  fieldTailoredCv.checked = item ? !!item.tailoredCv : false;
+  fieldCoverLetter.checked = item ? !!item.coverLetter : false;
   fieldStatus.value = item ? item.status : "to-apply";
   fieldOutcome.value = item ? item.outcome || "pending" : "pending";
   updateOutcomeVisibility();
@@ -764,6 +985,13 @@ cardForm.addEventListener("submit", async (e) => {
     deadline: fieldDeadline.value,
     salary: fieldSalary.value.trim(),
     contactPerson: fieldContact.value.trim(),
+    source: fieldSource.value,
+    cvVersion: fieldCvVersion.value.trim(),
+    matchScore: getScalePickerValue(matchScorePicker),
+    interestScore: getScalePickerValue(interestScorePicker),
+    referral: fieldReferral.checked,
+    tailoredCv: fieldTailoredCv.checked,
+    coverLetter: fieldCoverLetter.checked,
     tags: [...editingTags],
     status: fieldStatus.value,
     outcome: fieldStatus.value === "response" ? fieldOutcome.value : "pending",
@@ -902,7 +1130,7 @@ exportJsonBtn.addEventListener("click", () => {
 });
 
 exportCsvBtn.addEventListener("click", () => {
-  const header = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Contact", "Tags", "Link", "Notes"];
+  const header = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Contact", "Source", "CV Version", "Match Score", "Interest Score", "Referral", "Tailored CV", "Cover Letter", "Tags", "Link", "Notes"];
   const rows = candidatures.map((c) => [
     c.company,
     c.role,
@@ -912,6 +1140,13 @@ exportCsvBtn.addEventListener("click", () => {
     c.deadline,
     c.salary,
     c.contactPerson,
+    c.source,
+    c.cvVersion,
+    c.matchScore || "",
+    c.interestScore || "",
+    c.referral ? "Yes" : "No",
+    c.tailoredCv ? "Yes" : "No",
+    c.coverLetter ? "Yes" : "No",
     c.tags.map((t) => resolveTag(t).label).join("; "),
     c.link,
     c.notes.map((n) => `[${STATUS_LABELS[n.status] || n.status}] ${n.text}`).join(" | "),
@@ -954,6 +1189,33 @@ importJsonInput.addEventListener("change", () => {
     }
   };
   reader.readAsText(file);
+});
+
+/* ---------- onboarding ---------- */
+
+onboardSearchingToggle.querySelectorAll(".scale-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    onboardSearchingToggle.dataset.value = btn.dataset.value;
+    onboardSearchingToggle.querySelectorAll(".scale-btn").forEach((b) => {
+      b.classList.toggle("active", b === btn);
+    });
+  });
+});
+
+onboardFreshBtn.addEventListener("click", async () => {
+  const info = await saveOnboardingInfo();
+  onboardingSection.classList.add("hidden");
+  if (info) showRecommendations(info.targetRole, info.weeklyGoal);
+  openModal(null);
+});
+
+onboardImportBtn.addEventListener("click", async () => {
+  await saveOnboardingInfo();
+  importJsonInput.click();
+});
+
+dismissRecommendations.addEventListener("click", () => {
+  recommendationsBanner.classList.add("hidden");
 });
 
 /* ---------- dark mode ---------- */

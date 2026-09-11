@@ -61,7 +61,37 @@
   </section>
 
   <div id="trackerRoot" class="hidden">
-    <div class="toolbar">
+    <div id="onboardingSection" class="onboarding hidden">
+      <div class="onboarding-inner">
+        <h2>Let's set up your job search.</h2>
+        <div class="onboarding-field">
+          <label for="onboardTargetRole">What's your target role?</label>
+          <input type="text" id="onboardTargetRole" placeholder="e.g. Product Manager">
+        </div>
+        <div class="onboarding-field">
+          <label for="onboardWeeklyGoal">How many applications do you want to send each week?</label>
+          <input type="number" id="onboardWeeklyGoal" min="1" placeholder="e.g. 10">
+        </div>
+        <div class="onboarding-field">
+          <div class="notes-label">Are you already searching?</div>
+          <div class="onboarding-toggle" id="onboardSearchingToggle" data-value="">
+            <button type="button" class="scale-btn" data-value="yes">Yes</button>
+            <button type="button" class="scale-btn" data-value="no">Not yet</button>
+          </div>
+        </div>
+        <div class="onboarding-actions">
+          <button type="button" id="onboardImportBtn" class="ghost-btn">Import applications</button>
+          <button type="button" id="onboardFreshBtn" class="primary-btn">Start fresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="recommendationsBanner" class="follow-up-banner recommendations-banner hidden">
+      <button type="button" id="dismissRecommendations" class="dismiss-btn" aria-label="Dismiss">×</button>
+      <div id="recommendationsText"></div>
+    </div>
+
+    <div class="toolbar" id="toolbarEl">
       <input type="text" id="searchInput" class="toolbar-input" placeholder="Search by company or role...">
       <select id="tagFilterSelect" class="toolbar-input"></select>
       <label class="toolbar-checkbox" title="Shows applications overdue for a follow-up (10+ days since you applied, still Sent or Interview) or with a deadline in the next 3 days (or already passed).">
@@ -84,6 +114,24 @@
     </div>
 
     <div id="followUpBanner" class="follow-up-banner hidden"></div>
+
+    <div id="insightsSection" class="insights-section hidden">
+      <div class="insight-card hidden" id="insightSource">
+        <h3>Where are your interviews coming from?</h3>
+        <div class="insight-rows" id="insightSourceRows"></div>
+      </div>
+      <div class="insight-card hidden" id="insightCv">
+        <h3>Which CV performs best?</h3>
+        <div class="insight-rows" id="insightCvRows"></div>
+      </div>
+      <div class="insight-card hidden" id="insightMatch">
+        <p class="insight-callout" id="insightMatchText"></p>
+      </div>
+      <div class="insight-card hidden" id="insightTailored">
+        <h3>Tailored CV vs. generic</h3>
+        <div class="insight-rows" id="insightTailoredRows"></div>
+      </div>
+    </div>
 
     <div class="board" id="board">
       <div class="column" data-status="to-apply">
@@ -160,6 +208,24 @@
           <input type="text" id="fieldContact" placeholder="e.g. Jane Doe, Recruiter">
         </label>
 
+        <div class="field-row">
+          <label>Source
+            <select id="fieldSource">
+              <option value="">—</option>
+              <option value="LinkedIn">LinkedIn</option>
+              <option value="Indeed">Indeed</option>
+              <option value="Company website">Company website</option>
+              <option value="Recruiter">Recruiter</option>
+              <option value="Referral">Referral</option>
+              <option value="Networking">Networking</option>
+              <option value="Other">Other</option>
+            </select>
+          </label>
+          <label>CV version
+            <input type="text" id="fieldCvVersion" placeholder="e.g. CV Product">
+          </label>
+        </div>
+
         <label>Status
           <select id="fieldStatus">
             <option value="to-apply">To Apply</option>
@@ -175,6 +241,34 @@
             <option value="rejected">Rejected</option>
           </select>
         </label>
+
+        <div class="scale-field">
+          <div class="notes-label">How well do you match this job?</div>
+          <div class="scale-picker" id="matchScorePicker" data-value="0">
+            <button type="button" class="scale-btn" data-score="1">1</button>
+            <button type="button" class="scale-btn" data-score="2">2</button>
+            <button type="button" class="scale-btn" data-score="3">3</button>
+            <button type="button" class="scale-btn" data-score="4">4</button>
+            <button type="button" class="scale-btn" data-score="5">5</button>
+          </div>
+        </div>
+
+        <div class="scale-field">
+          <div class="notes-label">How interested are you?</div>
+          <div class="scale-picker" id="interestScorePicker" data-value="0">
+            <button type="button" class="scale-btn" data-score="1">1</button>
+            <button type="button" class="scale-btn" data-score="2">2</button>
+            <button type="button" class="scale-btn" data-score="3">3</button>
+            <button type="button" class="scale-btn" data-score="4">4</button>
+            <button type="button" class="scale-btn" data-score="5">5</button>
+          </div>
+        </div>
+
+        <div class="checkbox-row">
+          <label class="inline-checkbox"><input type="checkbox" id="fieldReferral"> Referral?</label>
+          <label class="inline-checkbox"><input type="checkbox" id="fieldTailoredCv"> Tailored CV?</label>
+          <label class="inline-checkbox"><input type="checkbox" id="fieldCoverLetter"> Cover letter?</label>
+        </div>
 
         <div class="tags-field">
           <div class="notes-label">Tags</div>
