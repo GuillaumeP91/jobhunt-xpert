@@ -515,8 +515,9 @@ function render() {
 
 function updateStats() {
   const total = candidatures.length;
-  const sent = candidatures.filter((c) => c.status !== "to-apply").length;
-  const interviewed = candidatures.filter(reachedInterview).length;
+  const sentItems = candidatures.filter((c) => c.status !== "to-apply");
+  const sent = sentItems.length;
+  const interviewed = sentItems.filter(reachedInterview).length;
   const reachedResponse = candidatures.filter((c) => c.status === "response").length;
   const accepted = candidatures.filter((c) => c.status === "response" && c.outcome === "accepted").length;
 
