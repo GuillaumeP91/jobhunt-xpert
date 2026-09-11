@@ -259,6 +259,7 @@ function migrateCandidature(c) {
     coverLetter: !!c.coverLetter,
     tags: Array.isArray(c.tags) ? c.tags : [],
     status,
+    hadInterview: c.hadInterview !== undefined ? !!c.hadInterview : (status === "interview" || status === "response"),
     outcome: c.outcome || "pending",
     notes,
     createdAt: c.createdAt || Date.now(),
@@ -502,7 +503,7 @@ function render() {
     });
   });
 
-  const sentCount = candidatures.filter((c) => !!c.appliedDate).length;
+  const sentCount = candidatures.filter((c) => c.status !== "to-apply").length;
   sentStat.textContent = `${sentCount} application${sentCount === 1 ? "" : "s"} sent`;
 
   renderTagFilterOptions();
@@ -514,14 +515,14 @@ function render() {
 
 function updateStats() {
   const total = candidatures.length;
-  const sent = candidatures.filter((c) => !!c.appliedDate).length;
-  const reachedInterview = candidatures.filter((c) => c.status === "interview" || c.status === "response").length;
+  const sent = candidatures.filter((c) => c.status !== "to-apply").length;
+  const interviewed = candidatures.filter(reachedInterview).length;
   const reachedResponse = candidatures.filter((c) => c.status === "response").length;
   const accepted = candidatures.filter((c) => c.status === "response" && c.outcome === "accepted").length;
 
   statTotal.textContent = total;
   statSent.textContent = sent;
-  statInterviewRate.textContent = sent ? `${Math.round((reachedInterview / sent) * 100)}%` : "0%";
+  statInterviewRate.textContent = sent ? `${Math.round((interviewed / sent) * 100)}%` : "0%";
   statResponseRate.textContent = sent ? `${Math.round((reachedResponse / sent) * 100)}%` : "0%";
   statOfferRate.textContent = reachedResponse ? `${Math.round((accepted / reachedResponse) * 100)}%` : "0%";
 }
@@ -548,7 +549,7 @@ function updateFollowUpBanner() {
 }
 
 function reachedInterview(item) {
-  return item.status === "interview" || item.status === "response";
+  return item.status === "interview" || !!item.hadInterview;
 }
 
 function buildInsightRow(label, sentCount, interviewCount) {
@@ -588,7 +589,7 @@ function groupBy(items, keyFn) {
 }
 
 function updateInsights() {
-  const sent = candidatures.filter((c) => !!c.appliedDate);
+  const sent = candidatures.filter((c) => c.status !== "to-apply");
 
   // Where are your interviews coming from?
   const bySource = groupBy(sent, (c) => c.source);
@@ -977,6 +978,8 @@ document.addEventListener("keydown", (e) => {
 
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const existingItem = editingId ? candidatures.find((c) => c.id === editingId) : null;
+  const hadInterview = !!(existingItem && existingItem.hadInterview) || fieldStatus.value === "interview";
   const data = {
     company: fieldCompany.value.trim(),
     role: fieldRole.value.trim(),
@@ -994,6 +997,7 @@ cardForm.addEventListener("submit", async (e) => {
     coverLetter: fieldCoverLetter.checked,
     tags: [...editingTags],
     status: fieldStatus.value,
+    hadInterview,
     outcome: fieldStatus.value === "response" ? fieldOutcome.value : "pending",
   };
   if (!data.company || !data.role) return;
@@ -1079,6 +1083,7 @@ STATUSES.forEach((status) => {
     const item = candidatures.find((c) => c.id === id);
     if (item) {
       item.status = status;
+      if (status === "interview") item.hadInterview = true;
       if (status === "response" && !item.outcome) item.outcome = "pending";
       render();
       try {
