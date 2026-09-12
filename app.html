@@ -159,17 +159,22 @@
       <div class="insight-card hidden" id="insightSource">
         <h3>Where are your interviews coming from?</h3>
         <div class="insight-rows" id="insightSourceRows"></div>
+        <p class="insight-callout hidden" id="insightSourceText"></p>
       </div>
       <div class="insight-card hidden" id="insightCv">
         <h3>Which CV performs best?</h3>
         <div class="insight-rows" id="insightCvRows"></div>
-      </div>
-      <div class="insight-card hidden" id="insightMatch">
-        <p class="insight-callout" id="insightMatchText"></p>
+        <p class="insight-callout hidden" id="insightCvText"></p>
       </div>
       <div class="insight-card hidden" id="insightTailored">
         <h3>Tailored CV vs. generic</h3>
         <div class="insight-rows" id="insightTailoredRows"></div>
+        <p class="insight-callout hidden" id="insightTailoredText"></p>
+      </div>
+      <div class="insight-card hidden" id="insightReferral">
+        <h3>Referral vs. non-referral</h3>
+        <div class="insight-rows" id="insightReferralRows"></div>
+        <p class="insight-callout hidden" id="insightReferralText"></p>
       </div>
     </div>
 
@@ -234,6 +239,9 @@
         </label>
         <label>Job link
           <input type="text" id="fieldLink" placeholder="https://...">
+        </label>
+        <label>Job description
+          <textarea id="fieldJobDescription" rows="3" placeholder="Paste the job posting text here for reference..."></textarea>
         </label>
 
         <div class="field-row">
@@ -354,22 +362,6 @@
           </div>
         </div>
 
-        <div id="interviewsSection" class="notes-section hidden">
-          <div class="notes-label">Interviews</div>
-          <div id="interviewsList" class="notes-list"></div>
-          <button type="button" id="addInterviewBtn" class="ghost-btn">+ Add interview</button>
-        </div>
-
-        <div id="notesSection" class="notes-section hidden">
-          <div class="notes-label">Notes</div>
-          <div id="notesList" class="notes-list"></div>
-          <div class="add-note-row">
-            <textarea id="newNoteText" rows="2" placeholder="Add a note for this stage..."></textarea>
-            <button type="button" id="addNoteBtn" class="ghost-btn">Add note</button>
-          </div>
-        </div>
-        <div id="notesHint" class="notes-hint">Save this application first to start adding notes.</div>
-
         <div class="modal-actions">
           <button type="button" id="deleteBtn" class="danger-btn hidden">Delete</button>
           <div class="spacer"></div>
@@ -377,6 +369,57 @@
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Application detail view -->
+  <div id="detailModalOverlay" class="modal-overlay hidden">
+    <div class="modal detail-modal">
+      <div class="detail-header">
+        <h2 id="detailCompany"></h2>
+        <p id="detailRole" class="detail-role"></p>
+      </div>
+
+      <div class="detail-section">
+        <div class="notes-label">Timeline</div>
+        <div id="detailTimeline" class="detail-timeline"></div>
+      </div>
+
+      <div class="detail-section">
+        <div class="notes-label">Contact</div>
+        <p id="detailContact" class="detail-text"></p>
+      </div>
+
+      <div class="detail-section">
+        <div class="notes-label">Job description</div>
+        <p id="detailJobDescription" class="detail-text"></p>
+      </div>
+
+      <div class="detail-section">
+        <div class="notes-label">CV used</div>
+        <p id="detailCvVersion" class="detail-text"></p>
+      </div>
+
+      <div id="interviewsSection" class="notes-section">
+        <div class="notes-label">Interviews</div>
+        <div id="interviewsList" class="notes-list"></div>
+        <button type="button" id="addInterviewBtn" class="ghost-btn">+ Add interview</button>
+      </div>
+
+      <div id="notesSection" class="notes-section">
+        <div class="notes-label">Notes</div>
+        <div id="notesList" class="notes-list"></div>
+        <div class="add-note-row">
+          <textarea id="newNoteText" rows="2" placeholder="Add a note for this stage..."></textarea>
+          <button type="button" id="addNoteBtn" class="ghost-btn">Add note</button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <div class="spacer"></div>
+        <button type="button" id="detailCloseBtn" class="ghost-btn">Close</button>
+        <button type="button" id="detailEditBtn" class="primary-btn">Edit</button>
+      </div>
     </div>
   </div>
 

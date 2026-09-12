@@ -1055,6 +1055,39 @@ label.inline-checkbox {
   gap: 8px;
 }
 
+.detail-modal {
+  width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.detail-header h2 { margin: 0; }
+.detail-role { margin: 2px 0 0; color: var(--text-muted); font-size: 14px; }
+.detail-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.detail-text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+.detail-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.timeline-row { display: flex; gap: 10px; font-size: 13px; }
+.timeline-date { color: var(--text-muted); font-weight: 600; min-width: 56px; flex-shrink: 0; }
+.timeline-label { color: var(--text); }
+
 .notes-label {
   font-size: 13px;
   font-weight: 600;

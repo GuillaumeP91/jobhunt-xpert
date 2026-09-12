@@ -83,6 +83,7 @@ const QUOTES = [
 let candidatures = [];
 let currentUid = null;
 let editingId = null;
+let viewingId = null;
 let editingTags = [];
 let filters = { search: "", tag: "all", attentionOnly: false, showClosed: false };
 
@@ -134,12 +135,16 @@ const statOfferRate = document.getElementById("statOfferRate");
 const insightsSection = document.getElementById("insightsSection");
 const insightSource = document.getElementById("insightSource");
 const insightSourceRows = document.getElementById("insightSourceRows");
+const insightSourceText = document.getElementById("insightSourceText");
 const insightCv = document.getElementById("insightCv");
 const insightCvRows = document.getElementById("insightCvRows");
-const insightMatch = document.getElementById("insightMatch");
-const insightMatchText = document.getElementById("insightMatchText");
+const insightCvText = document.getElementById("insightCvText");
 const insightTailored = document.getElementById("insightTailored");
 const insightTailoredRows = document.getElementById("insightTailoredRows");
+const insightTailoredText = document.getElementById("insightTailoredText");
+const insightReferral = document.getElementById("insightReferral");
+const insightReferralRows = document.getElementById("insightReferralRows");
+const insightReferralText = document.getElementById("insightReferralText");
 
 const toolbarEl = document.getElementById("toolbarEl");
 const statsBarEl = document.getElementById("statsBar");
@@ -170,6 +175,7 @@ const cardForm = document.getElementById("cardForm");
 const fieldCompany = document.getElementById("fieldCompany");
 const fieldRole = document.getElementById("fieldRole");
 const fieldLink = document.getElementById("fieldLink");
+const fieldJobDescription = document.getElementById("fieldJobDescription");
 const fieldAppliedDate = document.getElementById("fieldAppliedDate");
 const fieldDeadline = document.getElementById("fieldDeadline");
 const fieldSalary = document.getElementById("fieldSalary");
@@ -205,11 +211,8 @@ const faSnooze3Btn = document.getElementById("faSnooze3Btn");
 const faSnooze7Btn = document.getElementById("faSnooze7Btn");
 const faCloseBtn = document.getElementById("faCloseBtn");
 const faMarkDoneBtn = document.getElementById("faMarkDoneBtn");
-const interviewsSection = document.getElementById("interviewsSection");
 const interviewsList = document.getElementById("interviewsList");
 const addInterviewBtn = document.getElementById("addInterviewBtn");
-const notesSection = document.getElementById("notesSection");
-const notesHint = document.getElementById("notesHint");
 const notesList = document.getElementById("notesList");
 const newNoteText = document.getElementById("newNoteText");
 const addNoteBtn = document.getElementById("addNoteBtn");
@@ -217,6 +220,16 @@ const tagsChips = document.getElementById("tagsChips");
 const tagPresets = document.getElementById("tagPresets");
 const customTagInput = document.getElementById("customTagInput");
 const addCustomTagBtn = document.getElementById("addCustomTagBtn");
+
+const detailModalOverlay = document.getElementById("detailModalOverlay");
+const detailCompany = document.getElementById("detailCompany");
+const detailRole = document.getElementById("detailRole");
+const detailTimeline = document.getElementById("detailTimeline");
+const detailContact = document.getElementById("detailContact");
+const detailJobDescription = document.getElementById("detailJobDescription");
+const detailCvVersion = document.getElementById("detailCvVersion");
+const detailCloseBtn = document.getElementById("detailCloseBtn");
+const detailEditBtn = document.getElementById("detailEditBtn");
 
 const interviewModalOverlay = document.getElementById("interviewModalOverlay");
 const interviewModalTitle = document.getElementById("interviewModalTitle");
@@ -390,11 +403,17 @@ function migrateCandidature(c) {
     followUpType = "check-in";
   }
 
+  const createdAt = c.createdAt || Date.now();
+  const statusHistory = Array.isArray(c.statusHistory) && c.statusHistory.length > 0
+    ? c.statusHistory
+    : [{ status, date: createdAt }];
+
   return {
     id: c.id || crypto.randomUUID(),
     company: c.company || "",
     role: c.role || "",
     link: c.link || "",
+    jobDescription: c.jobDescription || "",
     appliedDate: c.appliedDate || "",
     deadline: c.deadline || "",
     salary: c.salary || "",
@@ -408,15 +427,18 @@ function migrateCandidature(c) {
     coverLetter: !!c.coverLetter,
     tags: Array.isArray(c.tags) ? c.tags : [],
     status,
+    statusHistory,
     hadInterview: c.hadInterview !== undefined ? !!c.hadInterview : (status === "interview" || raw === "response"),
     closed,
     closedReason,
+    closedAt: c.closedAt || null,
     followUpDate,
     followUpType,
     followUpDone: !!c.followUpDone,
+    followUpDoneAt: c.followUpDoneAt || null,
     interviews: Array.isArray(c.interviews) ? c.interviews.map(migrateInterview) : [],
     notes,
-    createdAt: c.createdAt || Date.now(),
+    createdAt,
   };
 }
 
@@ -798,6 +820,7 @@ function updateFollowUpBanner() {
 
 async function markFollowUpDone(item) {
   item.followUpDone = true;
+  item.followUpDoneAt = Date.now();
   render();
   try {
     await upsertCandidature(currentUid, item);
@@ -813,7 +836,11 @@ function reachedInterview(item) {
 }
 
 function reachedDecision(item) {
-  return !!item.closed || item.status === "offer";
+  // A real response only happened for an explicit Rejected (they said no) or an
+  // Offer (they said yes) — Ghosted (no reply) and Withdrawn (the candidate acted,
+  // not the company) never received a response and must not count here.
+  if (item.status === "offer") return true;
+  return !!item.closed && item.closedReason === "rejected";
 }
 
 function buildInsightRow(label, sentCount, interviewCount) {
@@ -852,19 +879,34 @@ function groupBy(items, keyFn) {
   return map;
 }
 
+function rateOf(items) {
+  return items.length ? items.filter(reachedInterview).length / items.length : 0;
+}
+
+function formatMultiplier(x) {
+  return x % 1 === 0 ? x : x.toFixed(1);
+}
+
 function updateInsights() {
   const sent = candidatures.filter((c) => c.status !== "to-apply");
 
   // Where are your interviews coming from?
   const bySource = groupBy(sent, (c) => c.source);
   insightSourceRows.innerHTML = "";
+  insightSourceText.classList.add("hidden");
   if (bySource.size > 0) {
-    [...bySource.entries()]
-      .sort((a, b) => b[1].length - a[1].length)
-      .forEach(([source, items]) => {
-        const interviews = items.filter(reachedInterview).length;
-        insightSourceRows.appendChild(buildInsightRow(source, items.length, interviews));
-      });
+    const entries = [...bySource.entries()].sort((a, b) => b[1].length - a[1].length);
+    entries.forEach(([source, items]) => {
+      insightSourceRows.appendChild(buildInsightRow(source, items.length, items.filter(reachedInterview).length));
+    });
+    const qualifying = entries.filter(([, items]) => items.length >= 2);
+    if (qualifying.length >= 2) {
+      const best = qualifying.reduce((a, b) => (rateOf(b[1]) > rateOf(a[1]) ? b : a));
+      if (rateOf(best[1]) > 0) {
+        insightSourceText.innerHTML = `<strong>${best[0]}</strong> applications are currently performing best.`;
+        insightSourceText.classList.remove("hidden");
+      }
+    }
     insightSource.classList.remove("hidden");
   } else {
     insightSource.classList.add("hidden");
@@ -873,53 +915,67 @@ function updateInsights() {
   // Which CV performs best?
   const byCv = groupBy(sent, (c) => c.cvVersion);
   insightCvRows.innerHTML = "";
+  insightCvText.classList.add("hidden");
   if (byCv.size >= 2) {
-    [...byCv.entries()]
-      .sort((a, b) => b[1].length - a[1].length)
-      .forEach(([cv, items]) => {
-        const interviews = items.filter(reachedInterview).length;
-        insightCvRows.appendChild(buildInsightRow(cv, items.length, interviews));
-      });
+    const entries = [...byCv.entries()].sort((a, b) => b[1].length - a[1].length);
+    entries.forEach(([cv, items]) => {
+      insightCvRows.appendChild(buildInsightRow(cv, items.length, items.filter(reachedInterview).length));
+    });
+    const qualifying = entries.filter(([, items]) => items.length >= 2);
+    if (qualifying.length >= 2) {
+      const best = qualifying.reduce((a, b) => (rateOf(b[1]) > rateOf(a[1]) ? b : a));
+      if (rateOf(best[1]) > 0) {
+        insightCvText.innerHTML = `<strong>${best[0]}</strong> is currently your best-performing CV.`;
+        insightCvText.classList.remove("hidden");
+      }
+    }
     insightCv.classList.remove("hidden");
   } else {
     insightCv.classList.add("hidden");
   }
 
-  // Insights that need a meaningful sample size
-  const unlocked = candidatures.length >= 50;
-
-  if (unlocked) {
-    const highMatch = sent.filter((c) => c.matchScore >= 4);
-    const lowMatch = sent.filter((c) => c.matchScore > 0 && c.matchScore < 4);
-    const highRate = highMatch.length ? highMatch.filter(reachedInterview).length / highMatch.length : 0;
-    const lowRate = lowMatch.length ? lowMatch.filter(reachedInterview).length / lowMatch.length : 0;
-    if (highMatch.length > 0 && lowMatch.length > 0 && lowRate > 0) {
-      const multiplier = highRate / lowRate;
-      insightMatchText.innerHTML = `Your high-match applications generate <strong>${multiplier % 1 === 0 ? multiplier : multiplier.toFixed(1)}×</strong> more interviews.`;
-      insightMatch.classList.remove("hidden");
-    } else {
-      insightMatch.classList.add("hidden");
+  // Tailored CV vs. generic
+  const tailored = sent.filter((c) => c.tailoredCv);
+  const generic = sent.filter((c) => !c.tailoredCv);
+  insightTailoredRows.innerHTML = "";
+  insightTailoredText.classList.add("hidden");
+  if (tailored.length > 0 && generic.length > 0) {
+    insightTailoredRows.appendChild(buildInsightRow("Tailored CVs", tailored.length, tailored.filter(reachedInterview).length));
+    insightTailoredRows.appendChild(buildInsightRow("Generic CV", generic.length, generic.filter(reachedInterview).length));
+    const tailoredRate = rateOf(tailored);
+    const genericRate = rateOf(generic);
+    if (genericRate > 0 && tailoredRate > genericRate) {
+      insightTailoredText.innerHTML = `Tailored CVs generate <strong>${formatMultiplier(tailoredRate / genericRate)}×</strong> more interviews.`;
+      insightTailoredText.classList.remove("hidden");
     }
-
-    const tailored = sent.filter((c) => c.tailoredCv);
-    const generic = sent.filter((c) => !c.tailoredCv);
-    insightTailoredRows.innerHTML = "";
-    if (tailored.length > 0 && generic.length > 0) {
-      insightTailoredRows.appendChild(buildInsightRow("Tailored CVs", tailored.length, tailored.filter(reachedInterview).length));
-      insightTailoredRows.appendChild(buildInsightRow("Generic CV", generic.length, generic.filter(reachedInterview).length));
-      insightTailored.classList.remove("hidden");
-    } else {
-      insightTailored.classList.add("hidden");
-    }
+    insightTailored.classList.remove("hidden");
   } else {
-    insightMatch.classList.add("hidden");
     insightTailored.classList.add("hidden");
+  }
+
+  // Referral vs. non-referral
+  const referred = sent.filter((c) => c.referral);
+  const nonReferred = sent.filter((c) => !c.referral);
+  insightReferralRows.innerHTML = "";
+  insightReferralText.classList.add("hidden");
+  if (referred.length > 0 && nonReferred.length > 0) {
+    insightReferralRows.appendChild(buildInsightRow("Referral", referred.length, referred.filter(reachedInterview).length));
+    insightReferralRows.appendChild(buildInsightRow("No referral", nonReferred.length, nonReferred.filter(reachedInterview).length));
+    const referredRate = rateOf(referred);
+    const nonReferredRate = rateOf(nonReferred);
+    if (nonReferredRate > 0 && referredRate > nonReferredRate) {
+      insightReferralText.innerHTML = `Referrals generate <strong>${formatMultiplier(referredRate / nonReferredRate)}×</strong> more interviews.`;
+      insightReferralText.classList.remove("hidden");
+    }
+    insightReferral.classList.remove("hidden");
+  } else {
+    insightReferral.classList.add("hidden");
   }
 
   const anyVisible = !insightSource.classList.contains("hidden")
     || !insightCv.classList.contains("hidden")
-    || !insightMatch.classList.contains("hidden")
-    || !insightTailored.classList.contains("hidden");
+    || !insightTailored.classList.contains("hidden")
+    || !insightReferral.classList.contains("hidden");
   insightsSection.classList.toggle("hidden", !anyVisible);
 }
 
@@ -1117,7 +1173,7 @@ function buildCard(item) {
     card.appendChild(link);
   }
 
-  card.addEventListener("click", () => openModal(item));
+  card.addEventListener("click", () => openDetailView(item));
 
   card.addEventListener("dragstart", () => {
     card.classList.add("dragging");
@@ -1209,6 +1265,61 @@ function renderInterviewsList(item) {
     });
 }
 
+function buildTimeline(item) {
+  const toTs = (value) => (typeof value === "number" ? value : new Date(value + "T00:00:00").getTime());
+  const entries = [];
+
+  if (item.appliedDate) entries.push({ ts: toTs(item.appliedDate), label: "Applied" });
+  if (item.followUpDate) entries.push({ ts: toTs(item.followUpDate), label: "Follow-up scheduled" });
+  if (item.followUpDoneAt) entries.push({ ts: toTs(item.followUpDoneAt), label: "Follow-up sent" });
+
+  (item.interviews || []).forEach((iv) => {
+    if (iv.date) entries.push({ ts: toTs(iv.date), label: iv.type ? `Interview: ${iv.type}` : "Interview" });
+  });
+
+  (item.statusHistory || []).forEach((h) => {
+    // "to-apply" isn't interesting, and "applied" is redundant with the dedicated
+    // "Applied" entry above (both land on the same date in the common case).
+    if (h.status === "to-apply" || h.status === "applied") return;
+    entries.push({ ts: toTs(h.date), label: `Status: ${STATUS_LABELS[h.status] || h.status}` });
+  });
+
+  if (item.closedAt) {
+    entries.push({ ts: toTs(item.closedAt), label: `Closed: ${CLOSED_REASON_LABELS[item.closedReason] || "Closed"}` });
+  }
+
+  entries.sort((a, b) => a.ts - b.ts);
+  return entries.map((e) => ({
+    dateLabel: new Date(e.ts).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+    label: e.label,
+  }));
+}
+
+function renderDetailTimeline(item) {
+  detailTimeline.innerHTML = "";
+  const entries = buildTimeline(item);
+  if (entries.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "notes-empty";
+    empty.textContent = "No activity yet.";
+    detailTimeline.appendChild(empty);
+    return;
+  }
+  entries.forEach((entry) => {
+    const row = document.createElement("div");
+    row.className = "timeline-row";
+    const date = document.createElement("span");
+    date.className = "timeline-date";
+    date.textContent = entry.dateLabel;
+    const label = document.createElement("span");
+    label.className = "timeline-label";
+    label.textContent = entry.label;
+    row.appendChild(date);
+    row.appendChild(label);
+    detailTimeline.appendChild(row);
+  });
+}
+
 /* ---------- modal ---------- */
 
 function updateClosedReasonVisibility() {
@@ -1269,6 +1380,7 @@ function openModal(item) {
   fieldCompany.value = item ? item.company : "";
   fieldRole.value = item ? item.role : "";
   fieldLink.value = item ? item.link || "" : "";
+  fieldJobDescription.value = item ? item.jobDescription || "" : "";
   fieldAppliedDate.value = item ? item.appliedDate || "" : "";
   fieldDeadline.value = item ? item.deadline || "" : "";
   fieldSalary.value = item ? item.salary || "" : "";
@@ -1293,14 +1405,6 @@ function openModal(item) {
   renderTagEditorUI();
   updateTemplatePreview();
 
-  interviewsSection.classList.toggle("hidden", !item);
-  if (item) renderInterviewsList(item);
-
-  notesSection.classList.toggle("hidden", !item);
-  notesHint.classList.toggle("hidden", !!item);
-  newNoteText.value = "";
-  if (item) renderNotesList(item);
-
   modalOverlay.classList.remove("hidden");
   fieldCompany.focus();
 }
@@ -1310,6 +1414,35 @@ function closeModal() {
   cardForm.reset();
   editingId = null;
   editingTags = [];
+}
+
+function openDetailView(item) {
+  viewingId = item.id;
+  detailCompany.textContent = item.company;
+  detailRole.textContent = item.role;
+  renderDetailTimeline(item);
+  detailContact.textContent = item.contactPerson || "No contact added yet.";
+  detailJobDescription.textContent = item.jobDescription || "No description added.";
+  detailCvVersion.textContent = item.cvVersion || "—";
+  newNoteText.value = "";
+  renderNotesList(item);
+  renderInterviewsList(item);
+  detailModalOverlay.classList.remove("hidden");
+}
+
+function closeDetailView() {
+  detailModalOverlay.classList.add("hidden");
+  viewingId = null;
+}
+
+function getViewingItem() {
+  return candidatures.find((c) => c.id === viewingId) || null;
+}
+
+function refreshDetailView() {
+  if (!viewingId) return;
+  const item = getViewingItem();
+  if (item) openDetailView(item);
 }
 
 /* ---------- interview record modal ---------- */
@@ -1343,7 +1476,7 @@ function closeInterviewModal() {
 }
 
 addInterviewBtn.addEventListener("click", () => {
-  const candidature = candidatures.find((c) => c.id === editingId);
+  const candidature = getViewingItem();
   if (candidature) openInterviewModal(candidature, null);
 });
 
@@ -1382,6 +1515,7 @@ interviewForm.addEventListener("submit", async (e) => {
   }
 
   renderInterviewsList(candidatures[idx]);
+  renderDetailTimeline(candidatures[idx]);
   render();
   closeInterviewModal();
 
@@ -1399,6 +1533,7 @@ ivDeleteBtn.addEventListener("click", async () => {
   candidatures[idx].interviews = candidatures[idx].interviews.filter((iv) => iv.id !== editingInterviewId);
 
   renderInterviewsList(candidatures[idx]);
+  renderDetailTimeline(candidatures[idx]);
   render();
   closeInterviewModal();
 
@@ -1449,6 +1584,7 @@ function closeFollowUpAction() {
 async function snoozeFollowUp(item, days) {
   item.followUpDate = addDays(todayStr(), days);
   item.followUpDone = false;
+  item.followUpDoneAt = null;
   closeFollowUpAction();
   await saveCandidatureChange(item, "Couldn't save. Please try again.");
   showToast(`Snoozed ${item.company} for ${days} days.`);
@@ -1513,11 +1649,27 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !modalOverlay.classList.contains("hidden") && interviewModalOverlay.classList.contains("hidden")) closeModal();
 });
 
+detailCloseBtn.addEventListener("click", closeDetailView);
+detailEditBtn.addEventListener("click", () => {
+  const item = getViewingItem();
+  closeDetailView();
+  if (item) openModal(item);
+});
+detailModalOverlay.addEventListener("click", (e) => {
+  if (e.target === detailModalOverlay) closeDetailView();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !detailModalOverlay.classList.contains("hidden") && interviewModalOverlay.classList.contains("hidden")) closeDetailView();
+});
+
 cardForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  const existingItem = editingId ? candidatures.find((c) => c.id === editingId) : null;
   const hadInterview = fieldHadInterview.checked;
   const appliedDate = fieldAppliedDate.value;
   const status = fieldStatus.value;
+  const closedChecked = fieldClosed.checked;
+  const followUpDoneChecked = fieldFollowUpDone.checked;
 
   let followUpDate = fieldFollowUpDate.value;
   let followUpType = fieldFollowUpType.value;
@@ -1531,10 +1683,30 @@ cardForm.addEventListener("submit", async (e) => {
     }
   }
 
+  const statusHistory = existingItem ? [...(existingItem.statusHistory || [])] : [];
+  if (!existingItem || existingItem.status !== status) {
+    statusHistory.push({ status, date: Date.now() });
+  }
+
+  let closedAt = existingItem ? existingItem.closedAt : null;
+  if (closedChecked) {
+    if (!existingItem || !existingItem.closed) closedAt = Date.now();
+  } else {
+    closedAt = null;
+  }
+
+  let followUpDoneAt = existingItem ? existingItem.followUpDoneAt : null;
+  if (followUpDoneChecked) {
+    if (!existingItem || !existingItem.followUpDone) followUpDoneAt = Date.now();
+  } else {
+    followUpDoneAt = null;
+  }
+
   const data = {
     company: fieldCompany.value.trim(),
     role: fieldRole.value.trim(),
     link: fieldLink.value.trim(),
+    jobDescription: fieldJobDescription.value.trim(),
     appliedDate,
     deadline: fieldDeadline.value,
     salary: fieldSalary.value.trim(),
@@ -1548,12 +1720,15 @@ cardForm.addEventListener("submit", async (e) => {
     coverLetter: fieldCoverLetter.checked,
     tags: [...editingTags],
     status,
+    statusHistory,
     hadInterview,
     followUpDate,
     followUpType,
-    followUpDone: fieldFollowUpDone.checked,
-    closed: fieldClosed.checked,
-    closedReason: fieldClosed.checked ? fieldClosedReason.value : "",
+    followUpDone: followUpDoneChecked,
+    followUpDoneAt,
+    closed: closedChecked,
+    closedReason: closedChecked ? fieldClosedReason.value : "",
+    closedAt,
   };
   if (!data.company || !data.role) return;
 
@@ -1579,16 +1754,16 @@ cardForm.addEventListener("submit", async (e) => {
 });
 
 addNoteBtn.addEventListener("click", async () => {
-  if (!editingId) return;
+  if (!viewingId) return;
   const text = newNoteText.value.trim();
   if (!text) return;
-  const idx = candidatures.findIndex((c) => c.id === editingId);
+  const idx = candidatures.findIndex((c) => c.id === viewingId);
   if (idx === -1) return;
   candidatures[idx].notes.push({
     id: crypto.randomUUID(),
     text,
     date: Date.now(),
-    status: fieldStatus.value,
+    status: candidatures[idx].status,
   });
   newNoteText.value = "";
   renderNotesList(candidatures[idx]);
@@ -1616,6 +1791,11 @@ deleteBtn.addEventListener("click", async () => {
     showToast("Couldn't delete. Please try again.");
   }
 });
+
+function appendStatusHistory(item, newStatus) {
+  if (item.status === newStatus) return;
+  item.statusHistory = [...(item.statusHistory || []), { status: newStatus, date: Date.now() }];
+}
 
 async function saveCandidatureChange(item, errorMessage) {
   render();
@@ -1649,6 +1829,7 @@ STATUSES.forEach((status) => {
     if (!item) return;
 
     const prevStatus = item.status;
+    appendStatusHistory(item, status);
     item.status = status;
     item.closed = false;
     item.closedReason = "";
@@ -1698,6 +1879,7 @@ closedCardsContainer.addEventListener("drop", async (e) => {
   }
   item.closed = true;
   item.closedReason = reason;
+  item.closedAt = Date.now();
   saveCandidatureChange(item, "Couldn't save your changes. Please try again.");
 });
 
