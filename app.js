@@ -1,10 +1,11 @@
-import { auth, db, googleProvider } from "./firebase-init.js";
+import { auth, db, functions, googleProvider } from "./firebase-init.js";
 import {
   signInWithPopup, signOut, onAuthStateChanged, deleteUser,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
   doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+import { httpsCallable } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-functions.js";
 
 const isDemoMode = new URLSearchParams(location.search).get("demo") === "1";
 
@@ -2261,12 +2262,47 @@ function handleAuthChange(user) {
   }
 }
 
-function requestUnlock() {
+let checkoutInFlight = false;
+
+async function requestUnlock() {
   if (!auth.currentUser) {
     signInWithGoogle();
     return;
   }
-  showToast("Payments are coming soon — check back shortly!");
+  if (checkoutInFlight) return;
+  checkoutInFlight = true;
+  unlockBtn.disabled = true;
+  heroCtaBtn.disabled = true;
+  try {
+    const createCheckoutSession = httpsCallable(functions, "createCheckoutSession");
+    const result = await createCheckoutSession();
+    if (result.data && result.data.url) {
+      location.href = result.data.url;
+      return; // leaving the page — no need to reset the in-flight flag
+    }
+    showToast("Couldn't start checkout. Please try again.");
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't start checkout. Please try again.");
+  }
+  checkoutInFlight = false;
+  unlockBtn.disabled = false;
+  heroCtaBtn.disabled = false;
+}
+
+function handleCheckoutRedirect() {
+  const params = new URLSearchParams(location.search);
+  const checkout = params.get("checkout");
+  if (checkout === "success") {
+    showToast("Payment received — activating your account…");
+  } else if (checkout === "cancelled") {
+    showToast("Checkout cancelled — no charge was made.");
+  }
+  if (checkout) {
+    params.delete("checkout");
+    const rest = params.toString();
+    history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : ""));
+  }
 }
 
 /* ---------- demo mode ---------- */
@@ -2347,6 +2383,7 @@ initTheme();
 renderUserGreeting();
 updateQuote();
 setInterval(updateQuote, 60 * 1000);
+handleCheckoutRedirect();
 
 render();
 

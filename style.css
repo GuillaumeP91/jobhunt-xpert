@@ -840,6 +840,7 @@ header h1 {
   cursor: pointer;
 }
 .primary-btn:hover { background: var(--accent-hover); }
+.primary-btn:disabled { opacity: 0.6; cursor: default; }
 
 .ghost-btn {
   background: transparent;
