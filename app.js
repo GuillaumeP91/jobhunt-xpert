@@ -1,9 +1,9 @@
 import { auth, db, googleProvider } from "./firebase-init.js";
 import {
-  signInWithPopup, signOut, onAuthStateChanged,
+  signInWithPopup, signOut, onAuthStateChanged, deleteUser,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-auth.js";
 import {
-  doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, writeBatch,
+  doc, getDoc, setDoc, deleteDoc, collection, getDocs, onSnapshot, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 const isDemoMode = new URLSearchParams(location.search).get("demo") === "1";
@@ -111,6 +111,7 @@ const userMenu = document.getElementById("userMenu");
 const userAvatar = document.getElementById("userAvatar");
 const userDisplayName = document.getElementById("userDisplayName");
 const signOutBtn = document.getElementById("signOutBtn");
+const deleteAccountBtn = document.getElementById("deleteAccountBtn");
 const heroSection = document.getElementById("heroSection");
 const gateUnpaid = document.getElementById("gateUnpaid");
 const trackerRoot = document.getElementById("trackerRoot");
@@ -2171,6 +2172,42 @@ async function bootstrapUserProfile(user) {
   }
 }
 
+async function deleteAccount() {
+  if (isDemoMode || !auth.currentUser) return;
+  const user = auth.currentUser;
+
+  const typed = await openDialog({
+    title: "Delete your account?",
+    message: "This permanently deletes your account and every application you've tracked. This cannot be undone. Type DELETE to confirm.",
+    withInput: true,
+    confirmLabel: "Delete forever",
+  });
+  if (typed !== "DELETE") {
+    if (typed !== null) showToast("Account not deleted — you must type DELETE exactly.");
+    return;
+  }
+
+  try {
+    const snap = await getDocs(candidaturesCollection(user.uid));
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 500) {
+      const batch = writeBatch(db);
+      docs.slice(i, i + 500).forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    await deleteDoc(doc(db, "users", user.uid));
+    await deleteUser(user);
+    showToast("Your account has been deleted.");
+  } catch (err) {
+    console.error(err);
+    if (err && err.code === "auth/requires-recent-login") {
+      showToast("For your security, please sign out and sign back in, then try deleting your account again.");
+    } else {
+      showToast("Couldn't delete your account. Please try again.");
+    }
+  }
+}
+
 let profileUnsub = null;
 
 function showGateState(state) {
@@ -2295,6 +2332,7 @@ demoBannerCta.addEventListener("click", () => {
 
 signInBtn.addEventListener("click", signInWithGoogle);
 signOutBtn.addEventListener("click", () => signOut(auth).catch((err) => console.error(err)));
+deleteAccountBtn.addEventListener("click", deleteAccount);
 heroCtaBtn.addEventListener("click", requestUnlock);
 unlockBtn.addEventListener("click", requestUnlock);
 if (isDemoMode) {
