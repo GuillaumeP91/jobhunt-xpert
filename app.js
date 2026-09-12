@@ -2249,6 +2249,8 @@ function buildDemoCandidatures() {
     hadInterview: opts.hadInterview ?? false,
     closed: opts.closed || false,
     closedReason: opts.closedReason || "",
+    referral: opts.referral || false,
+    tailoredCv: opts.tailoredCv || false,
     interviews: opts.interviews || [],
     tags: opts.tags || [],
   });
@@ -2260,16 +2262,16 @@ function buildDemoCandidatures() {
     mk("Vercel", "Growth Manager", "applied", { appliedDate: addDays(today, -11), followUpDate: addDays(today, -1), followUpDone: false, source: "LinkedIn", contactPerson: "Priya Shah" }),
     mk("Dropbox", "Account Executive", "applied", { appliedDate: addDays(today, -10), followUpDate: today, followUpDone: false, source: "Referral" }),
     mk("Spotify", "Data Analyst", "applied", { appliedDate: addDays(today, -10), followUpDate: today, followUpDone: false, source: "Company website" }),
-    mk("Figma", "UX Researcher", "applied", { appliedDate: addDays(today, -16), followUpDone: true, source: "LinkedIn", cvVersion: "CV Success" }),
+    mk("Figma", "UX Researcher", "applied", { appliedDate: addDays(today, -16), followUpDone: true, source: "LinkedIn", cvVersion: "CV Success", tailoredCv: true }),
     mk("Linear", "Backend Engineer", "applied", { appliedDate: addDays(today, -18), followUpDone: true, source: "Referral", cvVersion: "CV Sales" }),
-    mk("Miro", "Partnerships Lead", "applied", { appliedDate: addDays(today, -20), followUpDone: true, source: "LinkedIn" }),
+    mk("Miro", "Partnerships Lead", "applied", { appliedDate: addDays(today, -20), followUpDone: true, source: "LinkedIn", referral: true }),
 
-    mk("Stripe", "Sales Engineer", "interview", { appliedDate: addDays(today, -9), hadInterview: true, followUpDone: true, source: "LinkedIn", cvVersion: "CV Sales", contactPerson: "Daniel Kim",
+    mk("Stripe", "Sales Engineer", "interview", { appliedDate: addDays(today, -9), hadInterview: true, followUpDone: true, source: "LinkedIn", cvVersion: "CV Sales", contactPerson: "Daniel Kim", tailoredCv: true,
       interviews: [{ id: crypto.randomUUID(), date: addDays(today, 2), time: "14:00", type: "Video call" }] }),
-    mk("Asana", "Customer Success Manager", "interview", { appliedDate: addDays(today, -7), hadInterview: true, followUpDone: true, source: "Referral", cvVersion: "CV Success",
+    mk("Asana", "Customer Success Manager", "interview", { appliedDate: addDays(today, -7), hadInterview: true, followUpDone: true, source: "Referral", cvVersion: "CV Success", referral: true, tailoredCv: true,
       interviews: [{ id: crypto.randomUUID(), date: addDays(today, 1), time: "10:30", type: "On-site" }] }),
 
-    mk("Canva", "Marketing Manager", "offer", { appliedDate: addDays(today, -25), hadInterview: true, followUpDone: true, source: "LinkedIn", cvVersion: "CV Success" }),
+    mk("Canva", "Marketing Manager", "offer", { appliedDate: addDays(today, -25), hadInterview: true, followUpDone: true, source: "LinkedIn", cvVersion: "CV Success", referral: true, tailoredCv: true }),
 
     mk("Slack", "Recruiter", "interview", { appliedDate: addDays(today, -19), hadInterview: true, followUpDone: true, source: "Company website", cvVersion: "CV Sales", closed: true, closedReason: "rejected" }),
     mk("Webflow", "Product Designer", "applied", { appliedDate: addDays(today, -22), followUpDone: true, source: "Recruiter", closed: true, closedReason: "ghosted" }),
