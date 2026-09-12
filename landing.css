@@ -64,6 +64,15 @@ body { background: var(--bg); }
   display: inline-block;
   padding: 14px 32px;
 }
+.lp-demo-link {
+  display: block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.lp-demo-link:hover { color: var(--accent); }
 .lp-hero-shot { min-width: 0; }
 
 .lp-price-card {

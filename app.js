@@ -6,25 +6,38 @@ import {
   doc, getDoc, setDoc, deleteDoc, collection, onSnapshot, writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
+const isDemoMode = new URLSearchParams(location.search).get("demo") === "1";
+
 const STORAGE_KEY = "jobhunting-candidatures";
 const THEME_KEY = "jobhunting-theme";
 const LAST_NOTIFIED_KEY = "jobhunting-last-notified-date";
 const USER_NAME_KEY = "jobhunting-user-name";
-const STATUSES = ["to-apply", "sent", "interview", "response"];
+const STATUSES = ["to-apply", "applied", "interview", "offer"];
 const STATUS_LABELS = {
   "to-apply": "To Apply",
-  sent: "Sent",
+  applied: "Applied",
   interview: "Interview",
-  response: "Response",
+  offer: "Offer",
+};
+const CLOSED_REASON_LABELS = {
+  rejected: "Rejected",
+  withdrawn: "Withdrawn",
+  ghosted: "Ghosted",
 };
 const FOLLOW_UP_DAYS = 10;
 const DEADLINE_WARNING_DAYS = 3;
 const INACTIVE_DAYS = 14;
-const LEGACY_STATUS_MAP = {
+// Raw status aliases: old internal keys (English "sent"/"response" used before the
+// pipeline rename, and the original French keys) that need resolving before a
+// candidature's real status/closed state can be derived. "response" isn't a 1:1
+// rename — see migrateCandidature() for how it maps to status+closed+closedReason.
+const RAW_STATUS_ALIASES = {
   "a-postuler": "to-apply",
   envoye: "sent",
   entretien: "interview",
   reponse: "response",
+  sent: "sent",
+  response: "response",
 };
 
 const TAG_PRESETS = [
@@ -71,14 +84,17 @@ let candidatures = [];
 let currentUid = null;
 let editingId = null;
 let editingTags = [];
-let filters = { search: "", tag: "all", attentionOnly: false };
+let filters = { search: "", tag: "all", attentionOnly: false, showClosed: false };
 
+const BOARD_COLUMNS = [...STATUSES, "closed"];
 const cardsContainers = Object.fromEntries(
-  STATUSES.map((s) => [s, document.getElementById(`cards-${s}`)])
+  BOARD_COLUMNS.map((s) => [s, document.getElementById(`cards-${s}`)])
 );
 const counts = Object.fromEntries(
-  STATUSES.map((s) => [s, document.getElementById(`count-${s}`)])
+  BOARD_COLUMNS.map((s) => [s, document.getElementById(`count-${s}`)])
 );
+const closedColumn = document.getElementById("closedColumn");
+const showClosedCheckbox = document.getElementById("showClosedCheckbox");
 
 const sentStat = document.getElementById("sentStat");
 const followUpBanner = document.getElementById("followUpBanner");
@@ -86,6 +102,9 @@ const quoteText = document.getElementById("quoteText");
 const themeToggleBtn = document.getElementById("themeToggleBtn");
 const userGreeting = document.getElementById("userGreeting");
 
+const demoModeLabel = document.getElementById("demoModeLabel");
+const demoBanner = document.getElementById("demoBanner");
+const demoBannerCta = document.getElementById("demoBannerCta");
 const signInBtn = document.getElementById("signInBtn");
 const userMenu = document.getElementById("userMenu");
 const userAvatar = document.getElementById("userAvatar");
@@ -135,6 +154,7 @@ const onboardFreshBtn = document.getElementById("onboardFreshBtn");
 const recommendationsBanner = document.getElementById("recommendationsBanner");
 const recommendationsText = document.getElementById("recommendationsText");
 const nextActionsSection = document.getElementById("nextActionsSection");
+const actionFollowUps = document.getElementById("actionFollowUps");
 const actionFollowUpsCount = document.getElementById("actionFollowUpsCount");
 const actionFollowUpsLabel = document.getElementById("actionFollowUpsLabel");
 const actionInterviewsCount = document.getElementById("actionInterviewsCount");
@@ -162,9 +182,10 @@ const fieldReferral = document.getElementById("fieldReferral");
 const fieldTailoredCv = document.getElementById("fieldTailoredCv");
 const fieldCoverLetter = document.getElementById("fieldCoverLetter");
 const fieldStatus = document.getElementById("fieldStatus");
-const outcomeField = document.getElementById("outcomeField");
-const fieldOutcome = document.getElementById("fieldOutcome");
 const fieldHadInterview = document.getElementById("fieldHadInterview");
+const fieldClosed = document.getElementById("fieldClosed");
+const closedReasonField = document.getElementById("closedReasonField");
+const fieldClosedReason = document.getElementById("fieldClosedReason");
 const fieldFollowUpDate = document.getElementById("fieldFollowUpDate");
 const fieldFollowUpType = document.getElementById("fieldFollowUpType");
 const fieldFollowUpDone = document.getElementById("fieldFollowUpDone");
@@ -172,6 +193,18 @@ const templateSelect = document.getElementById("templateSelect");
 const templatePreview = document.getElementById("templatePreview");
 const copyTemplateBtn = document.getElementById("copyTemplateBtn");
 const deleteBtn = document.getElementById("deleteBtn");
+const followUpListPanel = document.getElementById("followUpListPanel");
+const followUpListItems = document.getElementById("followUpListItems");
+const followUpActionOverlay = document.getElementById("followUpActionOverlay");
+const followUpActionTitle = document.getElementById("followUpActionTitle");
+const followUpActionContact = document.getElementById("followUpActionContact");
+const faTemplateSelect = document.getElementById("faTemplateSelect");
+const faTemplatePreview = document.getElementById("faTemplatePreview");
+const faCopyTemplateBtn = document.getElementById("faCopyTemplateBtn");
+const faSnooze3Btn = document.getElementById("faSnooze3Btn");
+const faSnooze7Btn = document.getElementById("faSnooze7Btn");
+const faCloseBtn = document.getElementById("faCloseBtn");
+const faMarkDoneBtn = document.getElementById("faMarkDoneBtn");
 const interviewsSection = document.getElementById("interviewsSection");
 const interviewsList = document.getElementById("interviewsList");
 const addInterviewBtn = document.getElementById("addInterviewBtn");
@@ -204,6 +237,7 @@ const dialogOverlay = document.getElementById("dialogOverlay");
 const dialogTitle = document.getElementById("dialogTitle");
 const dialogMessage = document.getElementById("dialogMessage");
 const dialogInput = document.getElementById("dialogInput");
+const dialogSelect = document.getElementById("dialogSelect");
 const dialogCancelBtn = document.getElementById("dialogCancelBtn");
 const dialogConfirmBtn = document.getElementById("dialogConfirmBtn");
 const toast = document.getElementById("toast");
@@ -212,7 +246,7 @@ const toast = document.getElementById("toast");
 
 let dialogResolve = null;
 
-function openDialog({ title = "", message = "", withInput = false, inputValue = "", confirmLabel = "OK", showCancel = true }) {
+function openDialog({ title = "", message = "", withInput = false, inputValue = "", withSelect = false, selectOptions = [], confirmLabel = "OK", showCancel = true }) {
   return new Promise((resolve) => {
     dialogResolve = resolve;
     dialogTitle.textContent = title;
@@ -220,12 +254,24 @@ function openDialog({ title = "", message = "", withInput = false, inputValue = 
     dialogMessage.classList.toggle("hidden", !message);
     dialogInput.classList.toggle("hidden", !withInput);
     dialogInput.value = inputValue;
+    dialogSelect.classList.toggle("hidden", !withSelect);
+    if (withSelect) {
+      dialogSelect.innerHTML = "";
+      selectOptions.forEach((opt) => {
+        const el = document.createElement("option");
+        el.value = opt.value;
+        el.textContent = opt.label;
+        dialogSelect.appendChild(el);
+      });
+    }
     dialogConfirmBtn.textContent = confirmLabel;
     dialogCancelBtn.classList.toggle("hidden", !showCancel);
     dialogOverlay.classList.remove("hidden");
     if (withInput) {
       dialogInput.focus();
       dialogInput.select();
+    } else if (withSelect) {
+      dialogSelect.focus();
     } else {
       dialogConfirmBtn.focus();
     }
@@ -240,8 +286,14 @@ function closeDialog(result) {
   }
 }
 
+function confirmDialogResult() {
+  if (!dialogSelect.classList.contains("hidden")) return dialogSelect.value;
+  if (!dialogInput.classList.contains("hidden")) return dialogInput.value;
+  return true;
+}
+
 dialogCancelBtn.addEventListener("click", () => closeDialog(null));
-dialogConfirmBtn.addEventListener("click", () => closeDialog(dialogInput.classList.contains("hidden") ? true : dialogInput.value));
+dialogConfirmBtn.addEventListener("click", () => closeDialog(confirmDialogResult()));
 dialogInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") { e.preventDefault(); closeDialog(dialogInput.value); }
 });
@@ -260,9 +312,18 @@ function showToast(message) {
 
 /* ---------- data ---------- */
 
-function normalizeStatus(status) {
-  if (STATUSES.includes(status)) return status;
-  if (LEGACY_STATUS_MAP[status]) return LEGACY_STATUS_MAP[status];
+function resolveRawStatus(status) {
+  return RAW_STATUS_ALIASES[status] || status;
+}
+
+function normalizeNoteStatus(status) {
+  const raw = resolveRawStatus(status);
+  if (raw === "sent") return "applied";
+  // A note logged back when "Response" was a single status can't be mapped to a
+  // precise stage anymore (no outcome/hadInterview context on a note) — "interview"
+  // is the closest honest label, since notes were almost always added after interviewing.
+  if (raw === "response") return "interview";
+  if (STATUSES.includes(raw)) return raw;
   return "to-apply";
 }
 
@@ -283,19 +344,46 @@ function migrateInterview(iv) {
 }
 
 function migrateCandidature(c) {
-  const status = normalizeStatus(c.status);
+  const raw = resolveRawStatus(c.status);
+
+  // "sent"/"response" are pre-rename statuses (Sent -> Applied, Response -> Offer).
+  // "response" isn't a straight rename: it used to conflate every terminal outcome,
+  // so it's derived from the outcome/hadInterview that existed at the time.
+  let status;
+  let closed = !!c.closed;
+  let closedReason = c.closedReason || "";
+  if (raw === "response") {
+    if (c.outcome === "accepted") {
+      status = "offer";
+      closed = c.closed ?? false;
+    } else if (c.outcome === "rejected") {
+      status = c.hadInterview ? "interview" : "applied";
+      closed = c.closed ?? true;
+      closedReason = c.closedReason || "rejected";
+    } else {
+      status = "interview";
+      closed = c.closed ?? false;
+    }
+  } else if (raw === "sent") {
+    status = "applied";
+  } else if (STATUSES.includes(raw)) {
+    status = raw;
+  } else {
+    status = "to-apply";
+  }
+
   let notes = c.notes;
   if (typeof notes === "string") {
     notes = notes ? [{ id: crypto.randomUUID(), text: notes, date: c.createdAt || Date.now(), status }] : [];
   } else if (!Array.isArray(notes)) {
     notes = [];
   } else {
-    notes = notes.map((n) => ({ ...n, status: normalizeStatus(n.status) }));
+    notes = notes.map((n) => ({ ...n, status: normalizeNoteStatus(n.status) }));
   }
 
   let followUpDate = c.followUpDate || "";
   let followUpType = c.followUpType || "";
-  if (!followUpDate && c.followUpDate === undefined && (status === "sent" || status === "interview") && c.appliedDate) {
+  if (!followUpDate && c.followUpDate === undefined && (status === "applied" || status === "interview") && c.appliedDate) {
     // Existing candidature saved before follow-up tracking existed: backfill the same
     // suggestion the old fixed-10-day reminder used to give, so today's banner keeps working.
     followUpDate = addDays(c.appliedDate, FOLLOW_UP_DAYS);
@@ -320,8 +408,9 @@ function migrateCandidature(c) {
     coverLetter: !!c.coverLetter,
     tags: Array.isArray(c.tags) ? c.tags : [],
     status,
-    hadInterview: c.hadInterview !== undefined ? !!c.hadInterview : (status === "interview" || status === "response"),
-    outcome: c.outcome || "pending",
+    hadInterview: c.hadInterview !== undefined ? !!c.hadInterview : (status === "interview" || raw === "response"),
+    closed,
+    closedReason,
     followUpDate,
     followUpType,
     followUpDone: !!c.followUpDone,
@@ -359,14 +448,17 @@ function unsubscribeCandidatures() {
 }
 
 async function upsertCandidature(uid, item) {
+  if (isDemoMode) return;
   await setDoc(doc(db, "users", uid, "candidatures", item.id), item);
 }
 
 async function removeCandidature(uid, id) {
+  if (isDemoMode) return;
   await deleteDoc(doc(db, "users", uid, "candidatures", id));
 }
 
 async function importCandidaturesBatch(uid, items) {
+  if (isDemoMode) return;
   for (let i = 0; i < items.length; i += 500) {
     const chunk = items.slice(i, i + 500);
     const batch = writeBatch(db);
@@ -439,13 +531,14 @@ function daysUntil(dateStr) {
 }
 
 function needsFollowUp(item) {
-  if (!item.followUpDate || item.followUpDone) return false;
-  if (item.status !== "sent" && item.status !== "interview") return false;
+  if (item.closed || !item.followUpDate || item.followUpDone) return false;
+  if (item.status !== "applied" && item.status !== "interview") return false;
   return item.followUpDate <= todayStr();
 }
 
 function isInactive(item) {
-  if (item.status !== "sent" && item.status !== "interview") return false;
+  if (item.closed) return false;
+  if (item.status !== "applied" && item.status !== "interview") return false;
   const days = daysSince(item.appliedDate);
   return days !== null && days >= INACTIVE_DAYS;
 }
@@ -571,27 +664,33 @@ function matchesFilters(item) {
   return true;
 }
 
+function renderColumn(status, items) {
+  const container = cardsContainers[status];
+  container.innerHTML = "";
+  counts[status].textContent = items.length;
+
+  if (items.length === 0) {
+    const hint = document.createElement("div");
+    hint.className = "empty-hint";
+    hint.textContent = "No applications";
+    container.appendChild(hint);
+    return;
+  }
+
+  items.forEach((item) => {
+    container.appendChild(buildCard(item));
+  });
+}
+
 function render() {
   const filtered = candidatures.filter(matchesFilters);
 
   STATUSES.forEach((status) => {
-    const container = cardsContainers[status];
-    container.innerHTML = "";
-    const items = filtered.filter((c) => c.status === status);
-    counts[status].textContent = items.length;
-
-    if (items.length === 0) {
-      const hint = document.createElement("div");
-      hint.className = "empty-hint";
-      hint.textContent = "No applications";
-      container.appendChild(hint);
-      return;
-    }
-
-    items.forEach((item) => {
-      container.appendChild(buildCard(item));
-    });
+    renderColumn(status, filtered.filter((c) => c.status === status && !c.closed));
   });
+  renderColumn("closed", filtered.filter((c) => c.closed));
+  closedColumn.classList.toggle("hidden", !filters.showClosed);
+  boardEl.classList.toggle("board-5col", filters.showClosed);
 
   const sentCount = candidatures.filter((c) => c.status !== "to-apply").length;
   sentStat.textContent = `${sentCount} application${sentCount === 1 ? "" : "s"} sent`;
@@ -618,6 +717,52 @@ function updateNextActions() {
 
   const anyAction = followUpsDue > 0 || interviewsToPrepare > 0 || inactive > 0;
   nextActionsSection.classList.toggle("hidden", !anyAction);
+
+  if (followUpsDue === 0) followUpListPanel.classList.add("hidden");
+  if (!followUpListPanel.classList.contains("hidden")) renderFollowUpList();
+}
+
+function renderFollowUpList() {
+  const overdue = candidatures.filter(needsFollowUp).sort((a, b) => a.followUpDate.localeCompare(b.followUpDate));
+  followUpListItems.innerHTML = "";
+
+  if (overdue.length === 0) {
+    followUpListPanel.classList.add("hidden");
+    return;
+  }
+
+  overdue.forEach((item) => {
+    const row = document.createElement("div");
+    row.className = "follow-up-row";
+
+    const info = document.createElement("div");
+    info.className = "follow-up-row-info";
+    const days = daysSince(item.followUpDate);
+    const overdueText = days > 0 ? `${days}d overdue` : "due today";
+    info.innerHTML = `<strong>${item.company}</strong> <span class="follow-up-row-days">${overdueText}</span>`;
+    row.appendChild(info);
+
+    const actions = document.createElement("div");
+    actions.className = "follow-up-row-actions";
+
+    const followUpBtn = document.createElement("button");
+    followUpBtn.type = "button";
+    followUpBtn.className = "ghost-btn small-btn";
+    followUpBtn.textContent = "Follow up";
+    followUpBtn.addEventListener("click", () => openFollowUpAction(item));
+    actions.appendChild(followUpBtn);
+
+    const doneBtn = document.createElement("button");
+    doneBtn.type = "button";
+    doneBtn.className = "mark-done-btn";
+    doneBtn.textContent = "✓";
+    doneBtn.title = "Mark follow-up as done";
+    doneBtn.addEventListener("click", () => markFollowUpDone(item));
+    actions.appendChild(doneBtn);
+
+    row.appendChild(actions);
+    followUpListItems.appendChild(row);
+  });
 }
 
 function updateStats() {
@@ -625,33 +770,28 @@ function updateStats() {
   const sentItems = candidatures.filter((c) => c.status !== "to-apply");
   const sent = sentItems.length;
   const interviewed = sentItems.filter(reachedInterview).length;
-  const reachedResponse = candidatures.filter((c) => c.status === "response").length;
-  const accepted = candidatures.filter((c) => c.status === "response" && c.outcome === "accepted").length;
+  const decided = candidatures.filter(reachedDecision).length;
+  const offers = candidatures.filter((c) => c.status === "offer").length;
 
   statTotal.textContent = total;
   statSent.textContent = sent;
   statInterviewRate.textContent = sent ? `${Math.round((interviewed / sent) * 100)}%` : "0%";
-  statResponseRate.textContent = sent ? `${Math.round((reachedResponse / sent) * 100)}%` : "0%";
-  statOfferRate.textContent = reachedResponse ? `${Math.round((accepted / reachedResponse) * 100)}%` : "0%";
+  statResponseRate.textContent = sent ? `${Math.round((decided / sent) * 100)}%` : "0%";
+  statOfferRate.textContent = decided ? `${Math.round((offers / decided) * 100)}%` : "0%";
 }
 
 function updateFollowUpBanner() {
+  // Follow-ups due are now surfaced by the "Next Actions" card (updateNextActions) —
+  // this banner is deadline-only to avoid saying the same thing twice.
   const overdue = candidatures.filter(needsFollowUp);
   const deadlines = candidatures.filter(needsDeadlineAttention);
 
-  if (overdue.length === 0 && deadlines.length === 0) {
+  if (deadlines.length === 0) {
     followUpBanner.classList.add("hidden");
     followUpBanner.innerHTML = "";
   } else {
     followUpBanner.classList.remove("hidden");
-    const lines = [];
-    if (overdue.length > 0) {
-      lines.push(`⏰ ${overdue.length} application${overdue.length === 1 ? "" : "s"} due for a follow-up: ${overdue.map((c) => c.company).join(", ")}`);
-    }
-    if (deadlines.length > 0) {
-      lines.push(`📅 ${deadlines.length} deadline${deadlines.length === 1 ? "" : "s"} coming up: ${deadlines.map((c) => c.company).join(", ")}`);
-    }
-    followUpBanner.innerHTML = lines.join("<br>");
+    followUpBanner.innerHTML = `📅 ${deadlines.length} deadline${deadlines.length === 1 ? "" : "s"} coming up: ${deadlines.map((c) => c.company).join(", ")}`;
   }
   maybeNotify(overdue, deadlines);
 }
@@ -670,6 +810,10 @@ async function markFollowUpDone(item) {
 
 function reachedInterview(item) {
   return item.status === "interview" || !!item.hadInterview;
+}
+
+function reachedDecision(item) {
+  return !!item.closed || item.status === "offer";
 }
 
 function buildInsightRow(label, sentCount, interviewCount) {
@@ -851,8 +995,10 @@ function buildCard(item) {
   card.draggable = true;
   card.dataset.id = item.id;
 
-  if (item.status === "response") {
-    card.classList.add(`outcome-${item.outcome}`);
+  if (item.closed) {
+    card.classList.add(`closed-${item.closedReason || "rejected"}`);
+  } else if (item.status === "offer") {
+    card.classList.add("status-offer");
   }
 
   const company = document.createElement("div");
@@ -896,10 +1042,10 @@ function buildCard(item) {
     metaRow.appendChild(source);
   }
 
-  if (item.status === "response") {
+  if (item.closed) {
     const badge = document.createElement("span");
-    badge.className = `outcome-badge ${item.outcome}`;
-    badge.textContent = item.outcome === "accepted" ? "Accepted" : item.outcome === "rejected" ? "Rejected" : "Pending";
+    badge.className = `outcome-badge closed-${item.closedReason || "rejected"}`;
+    badge.textContent = CLOSED_REASON_LABELS[item.closedReason] || "Closed";
     metaRow.appendChild(badge);
   }
 
@@ -1065,12 +1211,11 @@ function renderInterviewsList(item) {
 
 /* ---------- modal ---------- */
 
-function updateOutcomeVisibility() {
-  outcomeField.classList.toggle("hidden", fieldStatus.value !== "response");
+function updateClosedReasonVisibility() {
+  closedReasonField.classList.toggle("hidden", !fieldClosed.checked);
 }
 
 function handleStatusFieldChange() {
-  updateOutcomeVisibility();
   if (fieldStatus.value === "interview") fieldHadInterview.checked = true;
 }
 
@@ -1136,12 +1281,13 @@ function openModal(item) {
   fieldTailoredCv.checked = item ? !!item.tailoredCv : false;
   fieldCoverLetter.checked = item ? !!item.coverLetter : false;
   fieldStatus.value = item ? item.status : "to-apply";
-  fieldOutcome.value = item ? item.outcome || "pending" : "pending";
   fieldHadInterview.checked = item ? !!item.hadInterview : false;
+  fieldClosed.checked = item ? !!item.closed : false;
+  fieldClosedReason.value = item ? item.closedReason || "rejected" : "rejected";
   fieldFollowUpDate.value = item ? item.followUpDate || "" : "";
   fieldFollowUpType.value = item ? item.followUpType || "" : "";
   fieldFollowUpDone.checked = item ? !!item.followUpDone : false;
-  updateOutcomeVisibility();
+  updateClosedReasonVisibility();
   deleteBtn.classList.toggle("hidden", !item);
 
   renderTagEditorUI();
@@ -1264,9 +1410,80 @@ ivDeleteBtn.addEventListener("click", async () => {
   }
 });
 
+/* ---------- follow-up action drawer ---------- */
+
+let followUpActionItem = null;
+
+actionFollowUps.addEventListener("click", () => {
+  const isHidden = followUpListPanel.classList.contains("hidden");
+  if (isHidden) renderFollowUpList();
+  followUpListPanel.classList.toggle("hidden", !isHidden);
+});
+
+function updateFollowUpActionPreview() {
+  if (!followUpActionItem) return;
+  const build = MESSAGE_TEMPLATES[faTemplateSelect.value];
+  if (!build) return;
+  faTemplatePreview.value = build({
+    company: followUpActionItem.company,
+    role: followUpActionItem.role,
+    contactPerson: followUpActionItem.contactPerson,
+  });
+}
+
+function openFollowUpAction(item) {
+  followUpActionItem = item;
+  followUpActionTitle.textContent = `Follow up — ${item.company}`;
+  followUpActionContact.textContent = item.contactPerson ? `Contact: ${item.contactPerson}` : "";
+  followUpActionContact.classList.toggle("hidden", !item.contactPerson);
+  faTemplateSelect.value = item.followUpType === "thank-you" ? "thank-you" : "check-in";
+  updateFollowUpActionPreview();
+  followUpActionOverlay.classList.remove("hidden");
+}
+
+function closeFollowUpAction() {
+  followUpActionOverlay.classList.add("hidden");
+  followUpActionItem = null;
+}
+
+async function snoozeFollowUp(item, days) {
+  item.followUpDate = addDays(todayStr(), days);
+  item.followUpDone = false;
+  closeFollowUpAction();
+  await saveCandidatureChange(item, "Couldn't save. Please try again.");
+  showToast(`Snoozed ${item.company} for ${days} days.`);
+}
+
+faTemplateSelect.addEventListener("change", updateFollowUpActionPreview);
+faCopyTemplateBtn.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(faTemplatePreview.value);
+    showToast("Template copied to clipboard.");
+  } catch (err) {
+    console.error(err);
+    showToast("Couldn't copy — select the text and copy it manually.");
+  }
+});
+faSnooze3Btn.addEventListener("click", () => followUpActionItem && snoozeFollowUp(followUpActionItem, 3));
+faSnooze7Btn.addEventListener("click", () => followUpActionItem && snoozeFollowUp(followUpActionItem, 7));
+faCloseBtn.addEventListener("click", closeFollowUpAction);
+faMarkDoneBtn.addEventListener("click", () => {
+  if (!followUpActionItem) return;
+  const item = followUpActionItem;
+  closeFollowUpAction();
+  markFollowUpDone(item);
+});
+followUpActionOverlay.addEventListener("click", (e) => {
+  if (e.target === followUpActionOverlay) closeFollowUpAction();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !followUpActionOverlay.classList.contains("hidden")) closeFollowUpAction();
+});
+
 addBtn.addEventListener("click", () => openModal(null));
 document.getElementById("cancelBtn").addEventListener("click", closeModal);
 fieldStatus.addEventListener("change", handleStatusFieldChange);
+fieldClosed.addEventListener("change", updateClosedReasonVisibility);
 templateSelect.addEventListener("change", updateTemplatePreview);
 fieldCompany.addEventListener("input", updateTemplatePreview);
 fieldRole.addEventListener("input", updateTemplatePreview);
@@ -1308,7 +1525,7 @@ cardForm.addEventListener("submit", async (e) => {
     if (hadInterview) {
       followUpDate = addDays(todayStr(), 1);
       followUpType = "thank-you";
-    } else if ((status === "sent" || status === "interview") && appliedDate) {
+    } else if ((status === "applied" || status === "interview") && appliedDate) {
       followUpDate = addDays(appliedDate, FOLLOW_UP_DAYS);
       followUpType = "check-in";
     }
@@ -1335,7 +1552,8 @@ cardForm.addEventListener("submit", async (e) => {
     followUpDate,
     followUpType,
     followUpDone: fieldFollowUpDone.checked,
-    outcome: status === "response" ? fieldOutcome.value : "pending",
+    closed: fieldClosed.checked,
+    closedReason: fieldClosed.checked ? fieldClosedReason.value : "",
   };
   if (!data.company || !data.role) return;
 
@@ -1399,6 +1617,16 @@ deleteBtn.addEventListener("click", async () => {
   }
 });
 
+async function saveCandidatureChange(item, errorMessage) {
+  render();
+  try {
+    await upsertCandidature(currentUid, item);
+  } catch (err) {
+    console.error(err);
+    showToast(errorMessage);
+  }
+}
+
 STATUSES.forEach((status) => {
   const container = cardsContainers[status];
 
@@ -1411,34 +1639,66 @@ STATUSES.forEach((status) => {
     container.classList.remove("drag-over");
   });
 
-  container.addEventListener("drop", async (e) => {
+  container.addEventListener("drop", (e) => {
     e.preventDefault();
     container.classList.remove("drag-over");
     const dragging = document.querySelector(".card.dragging");
     if (!dragging) return;
     const id = dragging.dataset.id;
     const item = candidatures.find((c) => c.id === id);
-    if (item) {
-      const prevStatus = item.status;
-      item.status = status;
-      if (status === "interview") {
-        item.hadInterview = true;
-      } else if (status === "response" && prevStatus !== "interview") {
-        // Dropped straight into Response without passing through Interview:
-        // this specific move means no interview happened, even if the card
-        // was flagged as interviewed at some earlier point.
-        item.hadInterview = false;
-      }
-      if (status === "response" && !item.outcome) item.outcome = "pending";
-      render();
-      try {
-        await upsertCandidature(currentUid, item);
-      } catch (err) {
-        console.error(err);
-        showToast("Couldn't save your changes. Please try again.");
-      }
+    if (!item) return;
+
+    const prevStatus = item.status;
+    item.status = status;
+    item.closed = false;
+    item.closedReason = "";
+    if (status === "interview") {
+      item.hadInterview = true;
+    } else if (status === "offer" && prevStatus !== "interview") {
+      // Dropped straight into Offer without passing through Interview:
+      // this specific move means no interview happened, even if the card
+      // was flagged as interviewed at some earlier point.
+      item.hadInterview = false;
     }
+    saveCandidatureChange(item, "Couldn't save your changes. Please try again.");
   });
+});
+
+const closedCardsContainer = cardsContainers.closed;
+closedCardsContainer.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  closedCardsContainer.classList.add("drag-over");
+});
+closedCardsContainer.addEventListener("dragleave", () => {
+  closedCardsContainer.classList.remove("drag-over");
+});
+closedCardsContainer.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  closedCardsContainer.classList.remove("drag-over");
+  const dragging = document.querySelector(".card.dragging");
+  if (!dragging) return;
+  const id = dragging.dataset.id;
+  const item = candidatures.find((c) => c.id === id);
+  if (!item) return;
+
+  const reason = await openDialog({
+    title: `Close ${item.company}?`,
+    message: "Why is this application closed?",
+    withSelect: true,
+    selectOptions: [
+      { value: "rejected", label: "Rejected" },
+      { value: "withdrawn", label: "Withdrawn" },
+      { value: "ghosted", label: "Ghosted (no response)" },
+    ],
+    confirmLabel: "Close application",
+  });
+  if (!reason) {
+    render();
+    return;
+  }
+  item.closed = true;
+  item.closedReason = reason;
+  saveCandidatureChange(item, "Couldn't save your changes. Please try again.");
 });
 
 /* ---------- toolbar: search / filter ---------- */
@@ -1453,6 +1713,10 @@ tagFilterSelect.addEventListener("change", () => {
 });
 attentionCheckbox.addEventListener("change", () => {
   filters.attentionOnly = attentionCheckbox.checked;
+  render();
+});
+showClosedCheckbox.addEventListener("change", () => {
+  filters.showClosed = showClosedCheckbox.checked;
   render();
 });
 
@@ -1479,7 +1743,7 @@ exportJsonBtn.addEventListener("click", () => {
   downloadBlob(JSON.stringify(candidatures, null, 2), "job-applications-backup.json", "application/json");
 });
 
-const CSV_HEADER = ["Company", "Role", "Status", "Outcome", "Applied On", "Deadline", "Salary", "Contact", "Source", "CV Version", "Match Score", "Interest Score", "Referral", "Tailored CV", "Cover Letter", "Follow-up Date", "Follow-up Done", "Interviews", "Tags", "Link", "Notes"];
+const CSV_HEADER = ["Company", "Role", "Status", "Closed", "Closed Reason", "Applied On", "Deadline", "Salary", "Contact", "Source", "CV Version", "Match Score", "Interest Score", "Referral", "Tailored CV", "Cover Letter", "Follow-up Date", "Follow-up Done", "Interviews", "Tags", "Link", "Notes"];
 
 function summarizeInterviews(interviews) {
   if (!interviews || interviews.length === 0) return "0";
@@ -1492,7 +1756,8 @@ exportCsvBtn.addEventListener("click", () => {
     c.company,
     c.role,
     STATUS_LABELS[c.status] || c.status,
-    c.status === "response" ? c.outcome : "",
+    c.closed ? "Yes" : "No",
+    c.closed ? (CLOSED_REASON_LABELS[c.closedReason] || c.closedReason) : "",
     c.appliedDate,
     c.deadline,
     c.salary,
@@ -1519,6 +1784,7 @@ importJsonBtn.addEventListener("click", () => importJsonInput.click());
 
 const LABEL_TO_STATUS = Object.fromEntries(Object.entries(STATUS_LABELS).map(([k, v]) => [v.toLowerCase(), k]));
 const LABEL_TO_TAG_ID = Object.fromEntries(TAG_PRESETS.map((t) => [t.label.toLowerCase(), t.id]));
+const LABEL_TO_CLOSED_REASON = Object.fromEntries(Object.entries(CLOSED_REASON_LABELS).map(([k, v]) => [v.toLowerCase(), k]));
 
 function parseCsvText(text) {
   const rows = [];
@@ -1559,7 +1825,8 @@ function csvRowsToCandidatures(rows) {
       company: get(row, "Company"),
       role: get(row, "Role"),
       status: LABEL_TO_STATUS[get(row, "Status").toLowerCase()] || "to-apply",
-      outcome: get(row, "Outcome").toLowerCase() || "pending",
+      closed: get(row, "Closed").toLowerCase() === "yes",
+      closedReason: LABEL_TO_CLOSED_REASON[get(row, "Closed Reason").toLowerCase()] || "",
       appliedDate: get(row, "Applied On"),
       deadline: get(row, "Deadline"),
       salary: get(row, "Salary"),
@@ -1783,11 +2050,74 @@ function requestUnlock() {
   showToast("Payments are coming soon — check back shortly!");
 }
 
+/* ---------- demo mode ---------- */
+
+function buildDemoCandidatures() {
+  const today = todayStr();
+  const mk = (company, role, status, opts = {}) => ({
+    id: crypto.randomUUID(),
+    company, role, status,
+    appliedDate: opts.appliedDate ?? addDays(today, -5),
+    source: opts.source || "LinkedIn",
+    cvVersion: opts.cvVersion || "",
+    contactPerson: opts.contactPerson || "",
+    salary: opts.salary || "",
+    followUpDate: opts.followUpDate ?? "",
+    followUpDone: opts.followUpDone ?? true,
+    hadInterview: opts.hadInterview ?? false,
+    closed: opts.closed || false,
+    closedReason: opts.closedReason || "",
+    interviews: opts.interviews || [],
+    tags: opts.tags || [],
+  });
+
+  return [
+    mk("Notion", "Product Manager", "to-apply", { appliedDate: "" }),
+    mk("Airbnb", "Frontend Engineer", "to-apply", { appliedDate: "" }),
+
+    mk("Vercel", "Growth Manager", "applied", { appliedDate: addDays(today, -11), followUpDate: addDays(today, -1), followUpDone: false, source: "LinkedIn", contactPerson: "Priya Shah" }),
+    mk("Dropbox", "Account Executive", "applied", { appliedDate: addDays(today, -10), followUpDate: today, followUpDone: false, source: "Referral" }),
+    mk("Spotify", "Data Analyst", "applied", { appliedDate: addDays(today, -10), followUpDate: today, followUpDone: false, source: "Company website" }),
+    mk("Figma", "UX Researcher", "applied", { appliedDate: addDays(today, -16), followUpDone: true, source: "LinkedIn", cvVersion: "CV Success" }),
+    mk("Linear", "Backend Engineer", "applied", { appliedDate: addDays(today, -18), followUpDone: true, source: "Referral", cvVersion: "CV Sales" }),
+    mk("Miro", "Partnerships Lead", "applied", { appliedDate: addDays(today, -20), followUpDone: true, source: "LinkedIn" }),
+
+    mk("Stripe", "Sales Engineer", "interview", { appliedDate: addDays(today, -9), hadInterview: true, followUpDone: true, source: "LinkedIn", cvVersion: "CV Sales", contactPerson: "Daniel Kim",
+      interviews: [{ id: crypto.randomUUID(), date: addDays(today, 2), time: "14:00", type: "Video call" }] }),
+    mk("Asana", "Customer Success Manager", "interview", { appliedDate: addDays(today, -7), hadInterview: true, followUpDone: true, source: "Referral", cvVersion: "CV Success",
+      interviews: [{ id: crypto.randomUUID(), date: addDays(today, 1), time: "10:30", type: "On-site" }] }),
+
+    mk("Canva", "Marketing Manager", "offer", { appliedDate: addDays(today, -25), hadInterview: true, followUpDone: true, source: "LinkedIn", cvVersion: "CV Success" }),
+
+    mk("Slack", "Recruiter", "interview", { appliedDate: addDays(today, -19), hadInterview: true, followUpDone: true, source: "Company website", cvVersion: "CV Sales", closed: true, closedReason: "rejected" }),
+    mk("Webflow", "Product Designer", "applied", { appliedDate: addDays(today, -22), followUpDone: true, source: "Recruiter", closed: true, closedReason: "ghosted" }),
+    mk("Zapier", "Solutions Engineer", "applied", { appliedDate: addDays(today, -15), followUpDone: true, source: "Indeed", closed: true, closedReason: "withdrawn" }),
+  ];
+}
+
+function startDemoMode() {
+  demoModeLabel.classList.remove("hidden");
+  signInBtn.classList.add("hidden");
+  userMenu.classList.add("hidden");
+  demoBanner.classList.remove("hidden");
+  showGateState("paid");
+  candidatures = buildDemoCandidatures().map(migrateCandidature);
+  render();
+}
+
+demoBannerCta.addEventListener("click", () => {
+  location.href = "app.html";
+});
+
 signInBtn.addEventListener("click", signInWithGoogle);
 signOutBtn.addEventListener("click", () => signOut(auth).catch((err) => console.error(err)));
 heroCtaBtn.addEventListener("click", requestUnlock);
 unlockBtn.addEventListener("click", requestUnlock);
-onAuthStateChanged(auth, handleAuthChange);
+if (isDemoMode) {
+  startDemoMode();
+} else {
+  onAuthStateChanged(auth, handleAuthChange);
+}
 
 /* ---------- init ---------- */
 

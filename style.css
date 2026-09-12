@@ -149,6 +149,32 @@ header {
   gap: 10px;
 }
 
+.demo-mode-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 6px 12px;
+  border-radius: 20px;
+}
+
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 16px 28px 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text);
+  text-align: center;
+}
+.demo-banner-question { font-weight: 600; }
+
 .brand-row {
   display: flex;
   align-items: center;
@@ -423,9 +449,34 @@ header h1 {
 .action-card#actionFollowUps { border-left: 3px solid var(--reminder); }
 .action-card#actionInterviews { border-left: 3px solid var(--accent); }
 .action-card#actionInactive { border-left: 3px solid var(--pending-border); }
+.action-card-clickable { cursor: pointer; }
+.action-card-clickable:hover { border-color: var(--reminder); }
 .action-icon { font-size: 22px; line-height: 1; }
 .action-count { font-size: 22px; font-weight: 800; color: var(--text); }
 .action-label { font-size: 12px; color: var(--text-muted); line-height: 1.3; }
+
+.follow-up-list-panel {
+  margin: 8px 28px 0;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.follow-up-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 7px;
+}
+.follow-up-row:hover { background: var(--bg); }
+.follow-up-row-info { font-size: 13px; }
+.follow-up-row-days { color: var(--reminder); font-size: 12px; font-weight: 600; margin-left: 6px; }
+.follow-up-row-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
 .template-field {
   border-top: 1px solid var(--border);
@@ -573,12 +624,20 @@ header h1 {
   padding: 24px;
   align-items: start;
 }
+.board.board-5col {
+  grid-template-columns: repeat(5, minmax(220px, 1fr));
+}
 
 .column {
   background: rgba(127,127,127,0.06);
   border-radius: 10px;
   padding: 12px;
   min-height: 200px;
+}
+
+.column-closed {
+  background: transparent;
+  border: 1px dashed var(--border);
 }
 
 .column h2 {
@@ -635,19 +694,24 @@ header h1 {
   opacity: 0.4;
 }
 
-.card.outcome-accepted {
-  background: var(--success-bg);
-  border-left-color: var(--success-border);
-}
-
-.card.outcome-rejected {
+.card.closed-rejected {
   background: var(--rejected-bg);
   border-left-color: var(--rejected-border);
 }
 
-.card.outcome-pending {
+.card.closed-ghosted {
   background: var(--pending-bg);
   border-left-color: var(--pending-border);
+}
+
+.card.closed-withdrawn {
+  background: var(--bg);
+  border-left-color: var(--text-muted);
+}
+
+.card.status-offer {
+  background: var(--success-bg);
+  border-left-color: var(--success-border);
 }
 
 .card .company {
@@ -680,9 +744,9 @@ header h1 {
   padding: 2px 8px;
   border-radius: 10px;
 }
-.outcome-badge.accepted { background: var(--success-border); color: white; }
-.outcome-badge.rejected { background: var(--rejected-border); color: white; }
-.outcome-badge.pending { background: var(--pending-border); color: white; }
+.outcome-badge.closed-rejected { background: var(--rejected-border); color: white; }
+.outcome-badge.closed-ghosted { background: var(--pending-border); color: white; }
+.outcome-badge.closed-withdrawn { background: var(--text-muted); color: white; }
 
 .card .reminder-badge, .card .deadline-badge {
   font-size: 11px;
@@ -1059,10 +1123,12 @@ label.inline-checkbox {
 
 .modal-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   margin-top: 8px;
 }
+.modal-actions button { white-space: nowrap; }
 
 .spacer { flex: 1; }
 
@@ -1107,10 +1173,10 @@ label.inline-checkbox {
   .stats-bar { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 900px) {
-  .board { grid-template-columns: 1fr 1fr; }
+  .board, .board.board-5col { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 560px) {
-  .board { grid-template-columns: 1fr; padding: 12px; }
+  .board, .board.board-5col { grid-template-columns: 1fr; padding: 12px; }
   header { flex-direction: column; gap: 12px; align-items: stretch; text-align: center; }
   .header-title { justify-content: center; }
   .stats-bar { grid-template-columns: repeat(2, 1fr); }

@@ -28,6 +28,7 @@
       </div>
     </div>
     <div class="header-actions">
+      <span id="demoModeLabel" class="demo-mode-label hidden">🎬 Demo Mode</span>
       <button id="signInBtn" class="ghost-btn small-btn" type="button">Sign in with Google</button>
       <div id="userMenu" class="user-menu hidden">
         <img id="userAvatar" class="user-avatar" alt="" referrerpolicy="no-referrer">
@@ -61,6 +62,11 @@
   </section>
 
   <div id="trackerRoot" class="hidden">
+    <div id="demoBanner" class="demo-banner hidden">
+      <span>You're viewing a demo — changes aren't saved.</span>
+      <span class="demo-banner-question">Ready to organize your real job search?</span>
+      <button type="button" id="demoBannerCta" class="primary-btn small-btn">Get JobHunt Xpert forever — €39.99</button>
+    </div>
     <div id="onboardingSection" class="onboarding hidden">
       <div class="onboarding-inner">
         <h2>Let's set up your job search.</h2>
@@ -100,7 +106,7 @@
     </div>
 
     <div id="nextActionsSection" class="next-actions hidden">
-      <div class="action-card" id="actionFollowUps">
+      <div class="action-card action-card-clickable" id="actionFollowUps">
         <div class="action-icon">⏰</div>
         <div class="action-count" id="actionFollowUpsCount">0</div>
         <div class="action-label" id="actionFollowUpsLabel">follow-ups due today</div>
@@ -117,12 +123,20 @@
       </div>
     </div>
 
+    <div id="followUpListPanel" class="follow-up-list-panel hidden">
+      <div id="followUpListItems"></div>
+    </div>
+
     <div class="toolbar" id="toolbarEl">
       <input type="text" id="searchInput" class="toolbar-input" placeholder="Search by company or role...">
       <select id="tagFilterSelect" class="toolbar-input"></select>
       <label class="toolbar-checkbox" title="Shows applications with a follow-up due (their follow-up date has arrived and isn't marked done) or with a deadline in the next 3 days (or already passed).">
         <input type="checkbox" id="attentionCheckbox">
         Needs attention only
+      </label>
+      <label class="toolbar-checkbox" title="Shows the Closed column (Rejected, Withdrawn, Ghosted applications), hidden by default.">
+        <input type="checkbox" id="showClosedCheckbox">
+        Show closed
       </label>
       <div class="toolbar-spacer"></div>
       <button id="exportJsonBtn" class="ghost-btn small-btn" type="button">Export JSON</button>
@@ -133,7 +147,7 @@
 
     <div class="stats-bar" id="statsBar">
       <div class="stat-tile"><div class="stat-value" id="statTotal">0</div><div class="stat-label">Total</div></div>
-      <div class="stat-tile"><div class="stat-value" id="statSent">0</div><div class="stat-label">Sent</div></div>
+      <div class="stat-tile"><div class="stat-value" id="statSent">0</div><div class="stat-label">Applied</div></div>
       <div class="stat-tile"><div class="stat-value" id="statInterviewRate">0%</div><div class="stat-label">Interview rate</div></div>
       <div class="stat-tile"><div class="stat-value" id="statResponseRate">0%</div><div class="stat-label">Response rate</div></div>
       <div class="stat-tile"><div class="stat-value" id="statOfferRate">0%</div><div class="stat-label">Offer rate</div></div>
@@ -164,17 +178,21 @@
         <h2>To Apply <span class="count" id="count-to-apply">0</span></h2>
         <div class="cards" id="cards-to-apply"></div>
       </div>
-      <div class="column" data-status="sent">
-        <h2>Sent <span class="count" id="count-sent">0</span></h2>
-        <div class="cards" id="cards-sent"></div>
+      <div class="column" data-status="applied">
+        <h2>Applied <span class="count" id="count-applied">0</span></h2>
+        <div class="cards" id="cards-applied"></div>
       </div>
       <div class="column" data-status="interview">
         <h2>Interview <span class="count" id="count-interview">0</span></h2>
         <div class="cards" id="cards-interview"></div>
       </div>
-      <div class="column" data-status="response">
-        <h2>Response <span class="count" id="count-response">0</span></h2>
-        <div class="cards" id="cards-response"></div>
+      <div class="column" data-status="offer">
+        <h2>Offer <span class="count" id="count-offer">0</span></h2>
+        <div class="cards" id="cards-offer"></div>
+      </div>
+      <div class="column column-closed hidden" id="closedColumn" data-status="closed">
+        <h2>Closed <span class="count" id="count-closed">0</span></h2>
+        <div class="cards" id="cards-closed"></div>
       </div>
     </div>
   </div>
@@ -192,6 +210,7 @@
       <h2 id="dialogTitle"></h2>
       <p id="dialogMessage" class="dialog-message hidden"></p>
       <input type="text" id="dialogInput" class="hidden">
+      <select id="dialogSelect" class="hidden"></select>
       <div class="modal-actions">
         <div class="spacer"></div>
         <button type="button" id="dialogCancelBtn" class="ghost-btn">Cancel</button>
@@ -255,19 +274,20 @@
         <label>Status
           <select id="fieldStatus">
             <option value="to-apply">To Apply</option>
-            <option value="sent">Sent</option>
+            <option value="applied">Applied</option>
             <option value="interview">Interview</option>
-            <option value="response">Response</option>
-          </select>
-        </label>
-        <label id="outcomeField" class="hidden">Outcome
-          <select id="fieldOutcome">
-            <option value="pending">Awaiting decision</option>
-            <option value="accepted">Accepted</option>
-            <option value="rejected">Rejected</option>
+            <option value="offer">Offer</option>
           </select>
         </label>
         <label class="inline-checkbox" id="hadInterviewField"><input type="checkbox" id="fieldHadInterview"> Had an interview?</label>
+        <label class="inline-checkbox" id="closedField"><input type="checkbox" id="fieldClosed"> Closed (no longer active)?</label>
+        <label id="closedReasonField" class="hidden">Reason
+          <select id="fieldClosedReason">
+            <option value="rejected">Rejected</option>
+            <option value="withdrawn">Withdrawn</option>
+            <option value="ghosted">Ghosted (no response)</option>
+          </select>
+        </label>
 
         <div class="field-row">
           <label>Next follow-up
@@ -409,6 +429,35 @@
           <button type="submit" class="primary-btn">Save</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Follow-up action drawer -->
+  <div id="followUpActionOverlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 id="followUpActionTitle">Follow up</h2>
+      <p id="followUpActionContact" class="dialog-message hidden"></p>
+
+      <div class="template-field">
+        <div class="notes-label">Message template</div>
+        <div class="template-row">
+          <select id="faTemplateSelect">
+            <option value="check-in">Check-in</option>
+            <option value="thank-you">Thank-you</option>
+            <option value="second-check-in">Second check-in</option>
+          </select>
+          <button type="button" id="faCopyTemplateBtn" class="ghost-btn">Copy</button>
+        </div>
+        <textarea id="faTemplatePreview" rows="5" readonly></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" id="faSnooze3Btn" class="ghost-btn">Snooze 3 days</button>
+        <button type="button" id="faSnooze7Btn" class="ghost-btn">Snooze 7 days</button>
+        <div class="spacer"></div>
+        <button type="button" id="faCloseBtn" class="ghost-btn">Close</button>
+        <button type="button" id="faMarkDoneBtn" class="primary-btn">Mark as done</button>
+      </div>
     </div>
   </div>
 
