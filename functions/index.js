@@ -10,7 +10,7 @@ const stripeWebhookSecret = defineSecret("STRIPE_WEBHOOK_SECRET");
 
 // Set after creating the Product/Price in the Stripe dashboard (test mode first).
 // Test and live mode each have their own price id — this gets updated again at go-live.
-const PRICE_ID = "price_REPLACE_ME";
+const PRICE_ID = "price_1UEqpMPojmzj8KUcTB9PIfhX";
 
 const SUCCESS_URL = "https://jobhuntxpert.com/app.html?checkout=success";
 const CANCEL_URL = "https://jobhuntxpert.com/app.html?checkout=cancelled";
