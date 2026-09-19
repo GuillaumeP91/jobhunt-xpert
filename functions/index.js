@@ -25,6 +25,9 @@ exports.createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, async (re
   const stripe = new Stripe(stripeSecretKey.value());
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
+    // A digital, non-taxable one-time product — Managed Payments (Stripe Tax) isn't
+    // needed here and requires a product tax code we don't have, so skip it.
+    managed_payments: { enabled: false },
     line_items: [{ price: PRICE_ID, quantity: 1 }],
     // Trusted server-side value from the verified auth token — never taken from client input,
     // so it can't be forged to unlock a different account.
