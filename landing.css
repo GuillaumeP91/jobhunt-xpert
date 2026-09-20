@@ -48,7 +48,7 @@ body { background: var(--bg); }
   font-size: 16px;
   font-weight: 600;
   color: var(--text-muted);
-  margin: 0 0 28px;
+  margin: 0 0 8px;
 }
 .lp-hero-price-line .lp-price-old {
   font-size: 17px;
@@ -59,6 +59,28 @@ body { background: var(--bg); }
   color: var(--accent);
   margin-right: 4px;
 }
+.lp-early-bird {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin: 0 0 20px;
+}
+.lp-early-bird strong { font-weight: 800; }
+.lp-early-bird code {
+  font-family: inherit;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.lp-price-row-compact + .lp-early-bird { margin: 0 auto 16px; }
 .lp-hero-text .lp-cta {
   width: auto;
   display: inline-block;

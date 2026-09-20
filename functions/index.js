@@ -28,6 +28,8 @@ exports.createCheckoutSession = onCall({ secrets: [stripeSecretKey] }, async (re
     // needed here and requires a product tax code we don't have, so skip it.
     managed_payments: { enabled: false },
     line_items: [{ price: PRICE_ID, quantity: 1 }],
+    // Lets a customer enter a promotion code (e.g. the early-adopter discount) at checkout.
+    allow_promotion_codes: true,
     // Trusted server-side value from the verified auth token — never taken from client input,
     // so it can't be forged to unlock a different account.
     client_reference_id: request.auth.uid,
